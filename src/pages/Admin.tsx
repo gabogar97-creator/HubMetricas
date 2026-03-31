@@ -12,7 +12,7 @@ export function Admin() {
   const [activeTab, setActiveTab] = useState('proj');
   const { projects, globalNSMs, refreshData, deleteProject, deleteCollectionNSM, updateProject, addProject, updateCollectionNSM, updateNSM, addNSM, deleteNSM } = useAppContext();
   
-  const [nsmLinkType, setNsmLinkType] = useState<'project' | 'okr'>('project');
+  const [nsmLinkType, setNsmLinkType] = useState<'project' | 'global'>('project');
 
   // Project Form State
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
@@ -138,7 +138,7 @@ export function Admin() {
 
   const handleEditNSM = (n: any) => {
     setEditingNsmId(n.id);
-    setNsmLinkType(n.projectId ? 'project' : 'okr');
+    setNsmLinkType(n.projectId ? 'project' : 'global');
     setNsmProjectId(n.projectId ? n.projectId.toString() : '');
     setNsmName(n.name);
     setNsmType(n.type || 'number');
@@ -197,7 +197,7 @@ export function Admin() {
                   <div className="mt-4 p-4 bg-[var(--bg4)] rounded-lg border border-[var(--border2)] space-y-4">
                     <div className="flex justify-between items-center">
                       <div className="text-xs font-semibold">Editando: {projRoiMethods.find(m => m.id === editingMethodId)?.name}</div>
-                      <button onClick={() => setEditingMethodId(null)} className="text-xs text-[var(--text3)] hover:text-white">Fechar Editor</button>
+                      <button onClick={() => setEditingMethodId(null)} className="text-xs text-[var(--text3)] hover:text-[var(--text)]">Fechar Editor</button>
                     </div>
                     
                     <div className="space-y-2">
@@ -260,7 +260,7 @@ export function Admin() {
                   <button onClick={() => {
                     setEditingProjectId(null);
                     setProjName(''); setProjDate(''); setProjCostFormula(''); setProjReturnFormula(''); setProjRoiMethods([]);
-                  }} className="px-4 py-2.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-white transition-colors">
+                  }} className="px-4 py-2.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
                     Cancelar
                   </button>
                 )}
@@ -318,10 +318,10 @@ export function Admin() {
                     Projeto
                   </button>
                   <button 
-                    onClick={() => setNsmLinkType('okr')}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${nsmLinkType === 'okr' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'}`}
+                    onClick={() => setNsmLinkType('global')}
+                    className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${nsmLinkType === 'global' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'}`}
                   >
-                    OKR (Global)
+                    Métrica Global
                   </button>
                 </div>
               </div>
@@ -350,7 +350,7 @@ export function Admin() {
                 </select>
               </div>
               <div className="flex gap-2 mt-2">
-                <button onClick={handleSaveNSM} className="flex-1 py-2.5 rounded-md text-xs font-semibold bg-[var(--accent)] text-black hover:bg-[#33ddff] transition-colors">
+                <button onClick={handleSaveNSM} className="flex-1 py-2.5 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors">
                   {editingNsmId ? 'Salvar Alterações' : 'Criar NSM'}
                 </button>
                 {editingNsmId && (
@@ -358,7 +358,7 @@ export function Admin() {
                     setEditingNsmId(null);
                     setNsmName('');
                     setNsmType('number');
-                  }} className="px-4 py-2.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-white transition-colors">
+                  }} className="px-4 py-2.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
                     Cancelar
                   </button>
                 )}
@@ -383,7 +383,7 @@ export function Admin() {
                   {/* Global NSMs */}
                   {globalNSMs.map(n => (
                     <tr key={n.id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                      <td className="px-4 py-3 text-[var(--accent)] font-semibold">OKR / Global</td>
+                      <td className="px-4 py-3 text-[var(--accent)] font-semibold">Global</td>
                       <td className="px-4 py-3 font-mono text-[11px]">{n.name}</td>
                       <td className="px-4 py-3 flex gap-3">
                         <button onClick={() => handleEditNSM(n)} className="text-[var(--accent)] hover:text-[#33ddff] text-xs font-medium">Editar</button>

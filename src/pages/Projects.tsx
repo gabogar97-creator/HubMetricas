@@ -21,7 +21,7 @@ export function Projects() {
   console.log('Projects component rendering...');
   console.log('Rendering Projects...');
   const { projects, globalNSMs, deleteCollectionROI, refreshData, addCollectionNSM, addCollectionROI } = useAppContext();
-  const [selId, setSelId] = useState<number | 'okr' | null>(null);
+  const [selId, setSelId] = useState<number | 'global' | null>(null);
   const [wizard, setWizard] = useState(false);
   const [nsmWizard, setNsmWizard] = useState(false);
 
@@ -31,8 +31,8 @@ export function Projects() {
     }
   }, [projects, selId]);
 
-  const project = selId === 'okr' ? null : projects.find(p => p.id === selId);
-  const isOKRMode = selId === 'okr';
+  const project = selId === 'global' ? null : projects.find(p => p.id === selId);
+  const isGlobalMode = selId === 'global';
 
   const {
     totalInvestment,
@@ -148,12 +148,12 @@ export function Projects() {
             value={selId || ''} 
             onChange={e => {
               const val = e.target.value;
-              setSelId(val === 'okr' ? 'okr' : Number(val));
+              setSelId(val === 'global' ? 'global' : Number(val));
             }}
           >
             <option value="" disabled>Selecione um projeto...</option>
             <optgroup label="Estratégico">
-              <option value="okr">OKRs (Métricas Globais)</option>
+              <option value="global">Métricas Globais (NSM)</option>
             </optgroup>
             <optgroup label="Projetos">
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -162,21 +162,21 @@ export function Projects() {
         </div>
       </div>
 
-      {!project && !isOKRMode ? (
+      {!project && !isGlobalMode ? (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl text-center p-16 text-[var(--text-dim)]">
           <div className="flex justify-center mb-3"><FolderOpen size={40} className="text-[var(--text-dim)]" /></div>
           <div className="text-[15px] text-[var(--text-mid)] font-semibold">Selecione ou crie um projeto</div>
         </div>
-      ) : isOKRMode ? (
+      ) : isGlobalMode ? (
         <div className="flex flex-col gap-4">
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
             <div className="flex justify-between items-center mb-4">
-              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">OKRs / Métricas Globais</div>
+              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Métricas Globais (NSM)</div>
               <button 
                 className="bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
                 onClick={() => setNsmWizard(true)}
               >
-                <Plus size={14} /> Nova Coleta OKR
+                <Plus size={14} /> Nova Coleta Global
               </button>
             </div>
             
@@ -186,7 +186,7 @@ export function Projects() {
               ))}
               {globalNSMs.length === 0 && (
                 <div className="col-span-full text-center p-8 text-[var(--text-dim)] text-sm">
-                  Nenhum OKR cadastrado no Admin.
+                  Nenhuma Métrica Global cadastrada no Cadastro.
                 </div>
               )}
             </div>
@@ -349,7 +349,7 @@ export function Projects() {
             <div className="flex justify-between items-center mb-4">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Coletas Registradas ({pc.length})</div>
               <button 
-                className="bg-[var(--green)] text-black px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
                 onClick={() => setWizard(true)}
               >
                 <Plus size={14} /> Nova Coleta
@@ -423,8 +423,8 @@ export function Projects() {
 
       {nsmWizard && (
         <NSMCollectionWizard 
-          nsms={isOKRMode ? globalNSMs : (project?.NSMs || [])}
-          title={isOKRMode ? "OKRs Globais" : `NSMs — ${project?.name}`}
+          nsms={isGlobalMode ? globalNSMs : (project?.NSMs || [])}
+          title={isGlobalMode ? "Métricas Globais" : `NSMs — ${project?.name}`}
           onClose={() => setNsmWizard(false)}
           onSave={async (payloads) => {
             for (const p of payloads) {
@@ -511,12 +511,12 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] w-full max-w-[480px] overflow-hidden shadow-2xl flex flex-col">
         <div className="flex justify-between items-center p-5 border-b border-[var(--border)]">
           <h3 className="text-sm font-bold">Nova Coleta — {title}</h3>
-          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-white"><X size={16} /></button>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X size={16} /></button>
         </div>
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
           <div>
             <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider mb-1.5">Data da Coleta</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]" />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]" />
           </div>
           <div className="space-y-3">
             {nsms.map(nsm => (
@@ -527,14 +527,14 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
                   value={values[nsm.id] || ''} 
                   onChange={e => setValues({ ...values, [nsm.id]: e.target.value })}
                   placeholder={`Valor (${nsm.type})`}
-                  className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]" 
+                  className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]" 
                 />
               </div>
             ))}
           </div>
         </div>
         <div className="p-5 border-t border-[var(--border)] flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-mid)] hover:text-white">Cancelar</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-mid)] hover:text-[var(--text)]">Cancelar</button>
           <button onClick={handleSave} className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-bold hover:opacity-80 transition-opacity">Salvar Coletas</button>
         </div>
       </div>
@@ -702,7 +702,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
               <div 
                 key={i} 
                 onClick={() => i < step && setStep(i)} 
-                className={`flex-1 p-[8px_2px] text-center text-[10px] font-bold ${i < step ? 'cursor-pointer' : 'cursor-default'} ${i === step ? 'bg-[var(--green)] text-black' : i < step ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'bg-transparent text-[var(--text-dim)]'} ${i < steps.length - 1 ? 'border-r border-[var(--border)]' : 'border-none'}`}
+                className={`flex-1 p-[8px_2px] text-center text-[10px] font-bold ${i < step ? 'cursor-pointer' : 'cursor-default'} ${i === step ? 'bg-[var(--green)] text-white' : i < step ? 'bg-[var(--green-dim)] text-[var(--green)]' : 'bg-transparent text-[var(--text-dim)]'} ${i < steps.length - 1 ? 'border-r border-[var(--border)]' : 'border-none'}`}
               >
                 {s.title}
               </div>
@@ -762,7 +762,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
             <button 
               type="button" 
               onClick={handleNext} 
-              className="bg-[var(--green)] text-black px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+              className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
             >
               Próximo <ArrowRight size={13} />
             </button>
@@ -771,7 +771,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
               type="button" 
               onClick={handleSubmit} 
               disabled={!methods.some((m: any) => methodsData[m.id].active)}
-              className="bg-[var(--green)] text-black px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save size={13} /> Salvar Coleta
             </button>

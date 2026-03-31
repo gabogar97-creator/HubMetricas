@@ -42,7 +42,7 @@ export function Dashboard() {
     projects.forEach(p => {
       if (p.NSMs) p.NSMs.forEach(n => list.push({ ...n, projectName: p.name }));
     });
-    globalNSMs.forEach(n => list.push({ ...n, projectName: 'OKR / Global' }));
+    globalNSMs.forEach(n => list.push({ ...n, projectName: 'Global' }));
     return list;
   }, [projects, globalNSMs]);
 
@@ -211,7 +211,7 @@ export function Dashboard() {
       }
     });
 
-    globalNSMs.forEach(nsm => processNsm(nsm, 'OKR / Global'));
+    globalNSMs.forEach(nsm => processNsm(nsm, 'Global'));
 
     const avgAchievement = totalNumericNsms > 0 ? sumAchievement / totalNumericNsms : 0;
 
@@ -369,7 +369,7 @@ export function Dashboard() {
                 ))}
               </select>
             </div>
-            <button onClick={() => setIsNsmModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-black hover:bg-[#33ddff] transition-colors">
+            <button onClick={() => setIsNsmModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors">
               <Plus size={14} />
               Adicionar Valores
             </button>
@@ -500,8 +500,8 @@ export function Dashboard() {
                 <input type="text" value={newNsmValue} onChange={(e) => setNewNsmValue(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
               </div>
               <div className="pt-2 flex justify-end gap-2">
-                <button onClick={() => setIsNsmModalOpen(false)} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-white transition-colors">Cancelar</button>
-                <button onClick={handleSaveNsmValue} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-black hover:bg-[#33ddff] transition-colors">Salvar</button>
+                <button onClick={() => setIsNsmModalOpen(false)} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Cancelar</button>
+                <button onClick={handleSaveNsmValue} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors">Salvar</button>
               </div>
             </div>
           </div>
