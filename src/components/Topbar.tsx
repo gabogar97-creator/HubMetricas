@@ -54,7 +54,7 @@ export function Topbar() {
 
   return (
     <header 
-      className={`h-14 bg-[var(--bg2)] border-b border-[var(--border)] px-7 flex items-center justify-between sticky top-0 z-40 transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}
+      className={`h-14 bg-[var(--glass-bg)] backdrop-blur-md border-b border-[var(--glass-border)] px-7 flex items-center justify-between sticky top-0 z-40 transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}
     >
       <div className="flex items-center gap-4">
         <button 
@@ -79,7 +79,7 @@ export function Topbar() {
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <div className="font-mono text-[11px] text-[var(--text3)] bg-[var(--bg3)] px-3 py-1.5 rounded border border-[var(--border)]">
+        <div className="font-mono text-[11px] text-[var(--text3)] bg-[var(--glass-bg)] backdrop-blur-sm px-3 py-1.5 rounded border border-[var(--glass-border)]">
           {format(new Date(), "dd MMM yyyy", { locale: ptBR })}
         </div>
       </div>

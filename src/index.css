@@ -1,24 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Arial", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto", Arial, sans-serif;
   --font-mono: "Space Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
   :root {
     --bg: #f8fafc;
-    --bg2: #ffffff;
-    --bg3: #f1f5f9;
-    --bg4: #e2e8f0;
-    --surface: #ffffff;
-    --surface-high: #f1f5f9;
-    --border: #e2e8f0;
-    --border-light: #cbd5e1;
-    --border2: #cbd5e1;
+    --bg2: rgba(255, 255, 255, 0.7);
+    --bg3: rgba(241, 245, 249, 0.7);
+    --bg4: rgba(226, 232, 240, 0.7);
+    --surface: rgba(255, 255, 255, 0.7);
+    --surface-high: rgba(255, 255, 255, 0.9);
+    --border: rgba(0, 0, 0, 0.05);
+    --border-light: rgba(0, 0, 0, 0.1);
+    --border2: rgba(0, 0, 0, 0.08);
     --green: #10b981;
-    --green-dim: #10b98115;
-    --green-border: #10b98135;
+    --green-dim: rgba(16, 185, 129, 0.1);
+    --green-border: rgba(16, 185, 129, 0.2);
     --red: #ef4444;
     --yellow: #f59e0b;
     --blue: #3b82f6;
@@ -33,40 +34,101 @@
     --custo-evitado: #3b82f6;
     --receita: #8b5cf6;
     --custo: #ef4444;
+
+    /* Glassmorphism tokens */
+    --glass-bg: rgba(255, 255, 255, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+    --glass-blur: blur(12px);
   }
 
   .dark {
-    --bg: #080c14;
-    --bg2: #0d1424;
-    --bg3: #111827;
-    --bg4: #1a2438;
-    --surface: #0d1424;
-    --surface-high: #111827;
-    --border: #1a2438;
-    --border-light: #243048;
-    --border2: #243048;
-    --green: #00c48c;
-    --green-dim: #00c48c15;
-    --green-border: #00c48c35;
-    --red: #f43f5e;
-    --yellow: #f59e0b;
-    --blue: #3b82f6;
-    --purple: #a855f7;
-    --text: #f1f5f9;
+    --bg: #0B0F19;
+    --bg2: rgba(17, 24, 39, 0.6);
+    --bg3: rgba(31, 41, 55, 0.6);
+    --bg4: rgba(55, 65, 81, 0.6);
+    --surface: rgba(17, 24, 39, 0.6);
+    --surface-high: rgba(31, 41, 55, 0.8);
+    --border: rgba(255, 255, 255, 0.05);
+    --border-light: rgba(255, 255, 255, 0.1);
+    --border2: rgba(255, 255, 255, 0.08);
+    --green: #00e69d;
+    --green-dim: rgba(0, 230, 157, 0.1);
+    --green-border: rgba(0, 230, 157, 0.2);
+    --red: #ff4d4d;
+    --yellow: #ffb84d;
+    --blue: #4d94ff;
+    --purple: #b366ff;
+    --text: #f8fafc;
     --text2: #cbd5e1;
     --text3: #94a3b8;
     --text-mid: #94a3b8;
-    --text-dim: #334155;
-    --accent: #3b82f6;
-    --saving: #00c48c;
-    --custo-evitado: #3b82f6;
-    --receita: #a855f7;
-    --custo: #f43f5e;
+    --text-dim: #475569;
+    --accent: #4d94ff;
+    --saving: #00e69d;
+    --custo-evitado: #4d94ff;
+    --receita: #b366ff;
+    --custo: #ff4d4d;
+
+    /* Glassmorphism tokens */
+    --glass-bg: rgba(17, 24, 39, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    --glass-blur: blur(12px);
   }
 
   body {
     background-color: var(--bg);
     color: var(--text);
+    position: relative;
+    min-height: 100vh;
+  }
+  
+  /* Global ambient glow */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+    opacity: 0.05;
+    filter: blur(100px);
+    z-index: -1;
+    pointer-events: none;
+  }
+  
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    right: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(circle, var(--purple) 0%, transparent 70%);
+    opacity: 0.05;
+    filter: blur(100px);
+    z-index: -1;
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+  
+  .glass-card {
+    background: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border);
+    box-shadow: var(--glass-shadow);
   }
 }
 

@@ -21,10 +21,12 @@ export const getSupabase = () => {
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Supabase URL or Key is missing. Please set SUPABASE_URL and SUPABASE_ANON_KEY in your environment variables.');
-      throw new Error('Supabase URL or Key is missing. Please set SUPABASE_URL and SUPABASE_ANON_KEY in your environment variables.');
+      // Use placeholder to prevent server crash on startup
+      supabaseClient = createClient('https://placeholder.supabase.co', 'placeholder');
+    } else {
+      console.log('Initializing Supabase client with URL:', supabaseUrl);
+      supabaseClient = createClient(supabaseUrl, supabaseKey);
     }
-    console.log('Initializing Supabase client with URL:', supabaseUrl);
-    supabaseClient = createClient(supabaseUrl, supabaseKey);
   }
   return supabaseClient;
 };

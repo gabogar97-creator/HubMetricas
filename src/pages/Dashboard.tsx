@@ -11,13 +11,6 @@ const fmtPct = (n: number | null) => n == null || isNaN(n) ? "—" : `${n > 0 ? 
 const fmtMonths = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : `${Math.round(n)} meses`;
 
 export function Dashboard() {
-  console.log('--- Dashboard component starting render now (final check 2) ---');
-  console.log('--- Dashboard component starting render now (final check) ---');
-  console.log('--- Dashboard component starting render now ---');
-  console.log('--- Dashboard component starting render ---');
-  console.log('Starting Dashboard component render...');
-  console.log('Dashboard component rendering...');
-  console.log('Rendering Dashboard...');
   const { projects, globalNSMs, refreshData, addCollectionNSM } = useAppContext();
   const [activeTab, setActiveTab] = useState<'roi' | 'nsm'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
@@ -81,7 +74,9 @@ export function Dashboard() {
       let hasCollections = false;
 
       p.CollectionROIs?.forEach(roi => {
+        if (!roi.date) return;
         const d = new Date(roi.date);
+        if (isNaN(d.getTime())) return;
         if (!hasCollections || d < firstDate) firstDate = d;
         if (!hasCollections || d > lastDate) lastDate = d;
         hasCollections = true;
@@ -162,7 +157,7 @@ export function Dashboard() {
       totalProjectsWithNsm++;
       
       // Sort to get latest
-      const sorted = [...collections].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const sorted = [...collections].sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
       const latest = sorted[0];
       
       const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
@@ -191,7 +186,9 @@ export function Dashboard() {
       // Timeline
       if (isNumeric) {
         sorted.forEach(col => {
-          const d = new Date(col.date);
+          if (!col.date) return;
+          const d = new Date(col.date.split('T')[0] + 'T12:00:00Z');
+          if (isNaN(d.getTime())) return;
           const day = format(d, 'dd/MM/yy', { locale: ptBR });
           if (!nsmTimeline[day]) {
             nsmTimeline[day] = { date: day, Valor: 0, Meta: 0, count: 0 };
@@ -221,7 +218,9 @@ export function Dashboard() {
     })).sort((a, b) => {
       const [dA, mA, yA] = a.date.split('/');
       const [dB, mB, yB] = b.date.split('/');
-      return new Date(`20${yA}-${mA}-${dA}`).getTime() - new Date(`20${yB}-${mB}-${dB}`).getTime();
+      const timeA = new Date(`20${yA}-${mA}-${dA}`).getTime() || 0;
+      const timeB = new Date(`20${yB}-${mB}-${dB}`).getTime() || 0;
+      return timeA - timeB;
     });
 
     return {
@@ -234,7 +233,7 @@ export function Dashboard() {
   }, [projects, selectedMetricFilter]);
 
   if (!projects.length) return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl text-center p-20 text-[var(--text-dim)]">
+    <div className="glass-card rounded-xl text-center p-20 text-[var(--text-dim)]">
       <div className="flex justify-center mb-4"><ChartBar size={48} className="text-[var(--text-dim)]" /></div>
       <div className="mt-4 text-base font-semibold text-[var(--text-mid)]">Nenhum projeto ainda</div>
       <div className="mt-1.5 text-[13px]">Vá em Projetos para criar o primeiro.</div>
@@ -246,10 +245,10 @@ export function Dashboard() {
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
       
-      <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap mb-2">
+      <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap mb-2 overflow-x-auto max-w-full">
         <button
           onClick={() => setActiveTab('roi')}
-          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
             activeTab === 'roi' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
           }`}
         >
@@ -257,7 +256,7 @@ export function Dashboard() {
         </button>
         <button
           onClick={() => setActiveTab('nsm')}
-          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
             activeTab === 'nsm' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
           }`}
         >
@@ -268,7 +267,7 @@ export function Dashboard() {
       {activeTab === 'roi' && (
         <>
           {/* Row 1 — 4 Big KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[14px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
         <KpiCard label="Total de Investimento" value={fmtShort(totalInvestment)} sub={fmt(totalInvestment)} color="var(--red)" />
         <KpiCard label="Retorno do Investimento" value={fmtShort(totalReturn)} sub={fmt(totalReturn)} color="var(--green)" />
         <KpiCard label="Payback do Investimento" value={fmtMonths(paybackMonths)} sub={paybackMonths ? `~${paybackMonths.toFixed(1)} meses` : "Sem retorno"} color="var(--yellow)" />
@@ -277,45 +276,45 @@ export function Dashboard() {
 
       {/* Row 2 — Averages */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+        <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
           <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-1.5">ROI Médio por Projeto</div>
           <div className="text-2xl font-extrabold mb-4" style={{ color: avgRoiPerProject != null ? (avgRoiPerProject >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-dim)' }}>
             {avgRoiPerProject != null ? fmtPct(avgRoiPerProject) : "—"}
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2">
             {projectMetrics.filter(x => x.roi != null).sort((a,b) => b.roi - a.roi).map((m) => (
-              <div key={m.name} className="flex justify-between items-center">
-                <span className="text-xs text-[var(--text-mid)]">{m.name}</span>
-                <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: m.roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)', color: m.roi >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              <div key={m.name} className="flex justify-between items-center glass-card p-2 rounded-lg">
+                <span className="text-xs text-[var(--text-mid)] truncate mr-2">{m.name}</span>
+                <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold shrink-0" style={{ background: m.roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)', color: m.roi >= 0 ? 'var(--green)' : 'var(--red)' }}>
                   {fmtPct(m.roi)}
                 </span>
               </div>
             ))}
             {projectMetrics.filter(x => x.roi === null).map((m) => (
-              <div key={m.name} className="flex justify-between items-center">
-                <span className="text-xs text-[var(--text-dim)]">{m.name}</span>
-                <span className="text-[11px] text-[var(--text-dim)]">sem coletas</span>
+              <div key={m.name} className="flex justify-between items-center glass-card p-2 rounded-lg">
+                <span className="text-xs text-[var(--text-dim)] truncate mr-2">{m.name}</span>
+                <span className="text-[11px] text-[var(--text-dim)] shrink-0">sem coletas</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+        <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
           <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-1.5">Payback Médio por Projeto</div>
           <div className="text-2xl font-extrabold text-[var(--yellow)] mb-4">{fmtMonths(avgPaybackPerProject)}</div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2">
             {projectMetrics.filter(x => x.payback != null && isFinite(x.payback)).sort((a,b) => a.payback - b.payback).map((m) => (
-              <div key={m.name} className="flex justify-between items-center">
-                <span className="text-xs text-[var(--text-mid)]">{m.name}</span>
-                <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold bg-[rgba(245,158,11,0.1)] text-[var(--yellow)]">
+              <div key={m.name} className="flex justify-between items-center glass-card p-2 rounded-lg">
+                <span className="text-xs text-[var(--text-mid)] truncate mr-2">{m.name}</span>
+                <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold bg-[rgba(245,158,11,0.1)] text-[var(--yellow)] shrink-0">
                   {fmtMonths(m.payback)}
                 </span>
               </div>
             ))}
             {projectMetrics.filter(x => x.payback == null || !isFinite(x.payback)).map((m) => (
-              <div key={m.name} className="flex justify-between items-center">
-                <span className="text-xs text-[var(--text-dim)]">{m.name}</span>
-                <span className="text-[11px] text-[var(--text-dim)]">—</span>
+              <div key={m.name} className="flex justify-between items-center glass-card p-2 rounded-lg">
+                <span className="text-xs text-[var(--text-dim)] truncate mr-2">{m.name}</span>
+                <span className="text-[11px] text-[var(--text-dim)] shrink-0">—</span>
               </div>
             ))}
           </div>
@@ -323,15 +322,15 @@ export function Dashboard() {
       </div>
 
           {/* Row 3 — Retorno por Tipo */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-4">Retorno por Tipo</div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-[14px] mb-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-[14px] mb-5">
               {[
                 {label:"Total de Saving",value:totalSaving,color:"var(--saving)"},
                 {label:"Total de Custo Evitado",value:totalCostAvoidance,color:"var(--custo-evitado)"},
                 {label:"Total de Receita",value:totalRevenue,color:"var(--receita)"},
               ].map(item=>(
-                <div key={item.label} className="bg-[var(--surface-high)] rounded-[10px] p-[14px_16px] border-l-[3px]" style={{ borderLeftColor: item.color }}>
+                <div key={item.label} className="glass-card rounded-[10px] p-[14px_16px] border-l-[3px]" style={{ borderLeftColor: item.color }}>
                   <div className="text-[11px] text-[var(--text-mid)] mb-1.5">{item.label}</div>
                   <div className="text-xl font-extrabold" style={{ color: item.color }}>{fmtShort(item.value)}</div>
                   <div className="text-[11px] text-[var(--text-dim)] mt-[3px]">{fmt(item.value)}</div>
@@ -339,15 +338,19 @@ export function Dashboard() {
               ))}
             </div>
             {(totalSaving+totalCostAvoidance+totalRevenue) > 0 && (
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={[{name:"Saving",value:totalSaving,fill:"var(--saving)"},{name:"Custo Evitado",value:totalCostAvoidance,fill:"var(--custo-evitado)"},{name:"Receita",value:totalRevenue,fill:"var(--receita)"}].filter(d=>d.value>0)} barSize={48}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                  <XAxis dataKey="name" tick={{fill:"var(--text-mid)",fontSize:11}} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>fmtShort(v).replace("R$ ","")}/>
-                  <Tooltip formatter={(v: number)=>fmt(v)} contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}} cursor={{fill:"var(--border-light)"}}/>
-                  <Bar dataKey="value" radius={[6,6,0,0]} fill="var(--green)"/>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-[300px]">
+                  <ResponsiveContainer width="100%" height={160}>
+                    <BarChart data={[{name:"Saving",value:totalSaving,fill:"var(--saving)"},{name:"Custo Evitado",value:totalCostAvoidance,fill:"var(--custo-evitado)"},{name:"Receita",value:totalRevenue,fill:"var(--receita)"}].filter(d=>d.value>0)} barSize={48}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                      <XAxis dataKey="name" tick={{fill:"var(--text-mid)",fontSize:11}} axisLine={false} tickLine={false}/>
+                      <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>fmtShort(v).replace("R$ ","")} width={60}/>
+                      <Tooltip formatter={(v: number)=>fmt(v)} contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}} cursor={{fill:"var(--border-light)"}}/>
+                      <Bar dataKey="value" radius={[6,6,0,0]} fill="var(--green)"/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             )}
           </div>
         </>
@@ -355,13 +358,13 @@ export function Dashboard() {
 
       {activeTab === 'nsm' && (
         <>
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
               <label className="text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Filtrar por Métrica:</label>
               <select 
                 value={selectedMetricFilter} 
                 onChange={(e) => setSelectedMetricFilter(e.target.value)} 
-                className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-1.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-1.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors w-full sm:w-auto"
               >
                 <option value="all">Todas as Métricas</option>
                 {nsmMetrics.availableMetrics.map(m => (
@@ -369,18 +372,18 @@ export function Dashboard() {
                 ))}
               </select>
             </div>
-            <button onClick={() => setIsNsmModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors">
+            <button onClick={() => setIsNsmModalOpen(true)} className="flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors w-full sm:w-auto">
               <Plus size={14} />
               Adicionar Valores
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-[14px]">
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px] overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-[14px]">
+            <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] overflow-hidden">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2">Projetos com NSM</div>
               <div className="text-[22px] font-extrabold leading-none text-[var(--blue)]">{nsmMetrics.totalProjectsWithNsm}</div>
               <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Total de projetos monitorando métricas</div>
             </div>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px] overflow-hidden">
+            <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] overflow-hidden">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2">Atingimento Médio Global</div>
               <div className="text-[22px] font-extrabold leading-none" style={{ color: nsmMetrics.avgAchievement >= 100 ? 'var(--green)' : nsmMetrics.avgAchievement >= 80 ? 'var(--yellow)' : 'var(--red)' }}>
                 {nsmMetrics.avgAchievement.toFixed(1)}%
@@ -390,27 +393,27 @@ export function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+            <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-4">Status Atual por Projeto</div>
               <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2">
                 {nsmMetrics.projectNsmList.map((m, i) => (
-                  <div key={i} className="bg-[var(--surface-high)] rounded-lg p-3 border border-[var(--border)]">
-                    <div className="flex justify-between items-start mb-2">
+                  <div key={i} className="glass-card rounded-lg p-3">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
                       <div>
                         <div className="text-xs font-bold text-[var(--text)]">{m.name}</div>
                         <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">{m.metricName}</div>
                       </div>
                       {m.isNumeric ? (
-                        <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: m.achievement >= 100 ? 'var(--green-dim)' : m.achievement >= 80 ? 'rgba(245,158,11,0.1)' : 'rgba(244,63,94,0.1)', color: m.achievement >= 100 ? 'var(--green)' : m.achievement >= 80 ? 'var(--yellow)' : 'var(--red)' }}>
+                        <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold w-fit" style={{ background: m.achievement >= 100 ? 'var(--green-dim)' : m.achievement >= 80 ? 'rgba(245,158,11,0.1)' : 'rgba(244,63,94,0.1)', color: m.achievement >= 100 ? 'var(--green)' : m.achievement >= 80 ? 'var(--yellow)' : 'var(--red)' }}>
                           {m.achievement.toFixed(1)}%
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold bg-[var(--surface-high)] text-[var(--text-mid)] border border-[var(--border)]">
+                        <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold glass-card text-[var(--text-mid)] w-fit">
                           {m.type === 'status' ? 'Status' : 'Texto'}
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-4 text-[11px] mb-3">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-[11px] mb-3">
                       <div><span className="text-[var(--text-dim)]">Atual:</span> <span className="font-mono text-[var(--text)]">{m.isNumeric ? Number(m.value).toLocaleString() : m.value}</span></div>
                       <div><span className="text-[var(--text-dim)]">Meta:</span> <span className="font-mono text-[var(--text)]">{m.isNumeric ? Number(m.target).toLocaleString() : m.target}</span></div>
                     </div>
@@ -421,7 +424,7 @@ export function Dashboard() {
                         <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Histórico</div>
                         <div className="max-h-[100px] overflow-y-auto">
                           <table className="w-full text-[10px] text-left">
-                            <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--surface-high)]">
+                            <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--bg3)]">
                               <tr>
                                 <th className="py-1 font-medium">Data</th>
                                 <th className="py-1 font-medium text-right">Valor</th>
@@ -430,7 +433,11 @@ export function Dashboard() {
                             <tbody className="divide-y divide-[var(--border)]">
                               {m.history.map((h: any, idx: number) => (
                                 <tr key={idx}>
-                                  <td className="py-1 text-[var(--text-mid)]">{format(new Date(h.date), 'dd/MM/yy', { locale: ptBR })}</td>
+                                  <td className="py-1 text-[var(--text-mid)]">
+                                    {h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime()) 
+                                      ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                                      : '-'}
+                                  </td>
                                   <td className="py-1 text-right font-mono text-[var(--text)]">{m.isNumeric ? Number(h.value).toLocaleString() : h.value}</td>
                                 </tr>
                               ))}
@@ -449,18 +456,22 @@ export function Dashboard() {
               </div>
             </div>
 
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+            <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-4">Evolução de Atingimento (Média %)</div>
               {nsmMetrics.timelineData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={nsmMetrics.timelineData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                    <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
-                    <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${v}%`}/>
-                    <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
-                    <Line type="monotone" dataKey="Atingimento Médio (%)" stroke="var(--blue)" strokeWidth={2} dot={{fill:"var(--blue)",r:4}}/>
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[300px]">
+                    <ResponsiveContainer width="100%" height={240}>
+                      <LineChart data={nsmMetrics.timelineData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                        <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                        <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${v}%`} width={40}/>
+                        <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
+                        <Line type="monotone" dataKey="Atingimento Médio (%)" stroke="var(--blue)" strokeWidth={2} dot={{fill:"var(--blue)",r:4}}/>
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               ) : (
                 <div className="h-[240px] flex items-center justify-center flex-col gap-2.5 text-[var(--text-dim)]">
                   <Target size={28} className="text-[var(--text-dim)]" />
@@ -474,7 +485,7 @@ export function Dashboard() {
 
       {isNsmModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl w-full max-w-md overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+          <div className="glass-card w-full max-w-md overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
               <h3 className="font-semibold text-[var(--text)]">Adicionar Valor NSM</h3>
               <button onClick={() => setIsNsmModalOpen(false)} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
@@ -514,10 +525,11 @@ export function Dashboard() {
 
 function KpiCard({ label, value, sub, color }: any) {
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px] overflow-hidden">
-      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2">{label}</div>
-      <div className="text-[22px] font-extrabold leading-none" style={{ color }}>{value}</div>
-      <div className="text-[11px] text-[var(--text-dim)] mt-1.5">{sub}</div>
+    <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] overflow-hidden relative group">
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2 relative z-10">{label}</div>
+      <div className="text-xl sm:text-[22px] font-extrabold leading-none relative z-10" style={{ color }}>{value}</div>
+      <div className="text-[11px] text-[var(--text-dim)] mt-1.5 relative z-10">{sub}</div>
     </div>
   );
 }

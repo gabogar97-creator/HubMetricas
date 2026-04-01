@@ -64,10 +64,12 @@ export function Projects() {
     const monthlyData: Record<string, any> = {};
 
     const projectCollections = project.CollectionROIs || [];
-    const sortedPc = [...projectCollections].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedPc = [...projectCollections].sort((a, b) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0));
 
     sortedPc.forEach(col => {
+      if (!col.date) return;
       const d = new Date(col.date);
+      if (isNaN(d.getTime())) return;
       if (!hasCollections || d < firstDate) firstDate = d;
       if (!hasCollections || d > lastDate) lastDate = d;
       hasCollections = true;
@@ -96,7 +98,9 @@ export function Projects() {
       if (!isNumeric) return;
       
       nsm.CollectionNSMs?.forEach(col => {
+        if (!col.date) return;
         const d = new Date(col.date);
+        if (isNaN(d.getTime())) return;
         const day = format(d, 'dd/MM/yy', { locale: ptBR });
         if (!nsmData[day]) {
           nsmData[day] = { date: day, Valor: 0, Meta: 0, count: 0 };
@@ -116,7 +120,9 @@ export function Projects() {
     })).sort((a, b) => {
       const [dA, mA, yA] = a.date.split('/');
       const [dB, mB, yB] = b.date.split('/');
-      return new Date(`20${yA}-${mA}-${dA}`).getTime() - new Date(`20${yB}-${mB}-${dB}`).getTime();
+      const timeA = new Date(`20${yA}-${mA}-${dA}`).getTime() || 0;
+      const timeB = new Date(`20${yB}-${mB}-${dB}`).getTime() || 0;
+      return timeA - timeB;
     });
 
     const pRoi = inv > 0 ? ((ret - inv) / inv) * 100 : (ret > 0 ? null : null);
@@ -163,13 +169,13 @@ export function Projects() {
       </div>
 
       {!project && !isGlobalMode ? (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl text-center p-16 text-[var(--text-dim)]">
+        <div className="glass-card rounded-xl text-center p-16 text-[var(--text-dim)]">
           <div className="flex justify-center mb-3"><FolderOpen size={40} className="text-[var(--text-dim)]" /></div>
           <div className="text-[15px] text-[var(--text-mid)] font-semibold">Selecione ou crie um projeto</div>
         </div>
       ) : isGlobalMode ? (
         <div className="flex flex-col gap-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+          <div className="glass-card rounded-xl p-[18px_20px]">
             <div className="flex justify-between items-center mb-4">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Métricas Globais (NSM)</div>
               <button 
@@ -214,7 +220,7 @@ export function Projects() {
           {/* Charts */}
           {pc.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
-              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+              <div className="glass-card rounded-xl p-[18px_20px]">
                 <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3.5">Evolução por Tipo de Retorno</div>
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={chartData}>
@@ -230,7 +236,7 @@ export function Projects() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+              <div className="glass-card rounded-xl p-[18px_20px]">
                 <div className="flex justify-between items-center mb-3.5">
                   <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Evolução da NSM</div>
                 </div>
@@ -258,12 +264,12 @@ export function Projects() {
 
           {/* NSM Metrics List */}
           {project.NSMs && project.NSMs.length > 0 && (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+            <div className="glass-card rounded-xl p-[18px_20px]">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-4">Métricas NSM</div>
               <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2">
                 {project.NSMs.map(nsm => {
                   const cols = nsm.CollectionNSMs || [];
-                  const sorted = [...cols].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                  const sorted = [...cols].sort((a,b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
                   const latest = sorted[0];
                   const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
                   
@@ -309,7 +315,11 @@ export function Projects() {
                                   <tbody className="divide-y divide-[var(--border)]">
                                     {sorted.map((h: any, idx: number) => (
                                       <tr key={idx}>
-                                        <td className="py-1 text-[var(--text-mid)]">{format(new Date(h.date), 'dd/MM/yy', { locale: ptBR })}</td>
+                                        <td className="py-1 text-[var(--text-mid)]">
+                                          {h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime())
+                                            ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                                            : '-'}
+                                        </td>
                                         <td className="py-1 text-right font-mono text-[var(--text)]">{isNumeric ? Number(h.value).toLocaleString() : h.value}</td>
                                       </tr>
                                     ))}
@@ -330,7 +340,7 @@ export function Projects() {
           )}
 
           {/* Formula */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+          <div className="glass-card rounded-xl p-[18px_20px]">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Fórmula / Memória de Cálculo</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-[14px]">
               <div className="bg-[var(--surface-high)] rounded-lg p-3">
@@ -345,7 +355,7 @@ export function Projects() {
           </div>
 
           {/* Collections */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+          <div className="glass-card rounded-xl p-[18px_20px]">
             <div className="flex justify-between items-center mb-4">
               <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Coletas Registradas ({pc.length})</div>
               <button 
@@ -440,7 +450,7 @@ export function Projects() {
 
 function NSMCard({ nsm }: { nsm: any, key?: any }) {
   const cols = nsm.CollectionNSMs || [];
-  const sorted = [...cols].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sorted = [...cols].sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
   const latest = sorted[0];
   const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
 
@@ -477,7 +487,11 @@ function NSMCard({ nsm }: { nsm: any, key?: any }) {
                 <tbody className="divide-y divide-[var(--border)]">
                   {sorted.slice(0, 5).map((h: any, idx: number) => (
                     <tr key={idx}>
-                      <td className="py-1 text-[var(--text-mid)]">{format(new Date(h.date), 'dd/MM/yy', { locale: ptBR })}</td>
+                      <td className="py-1 text-[var(--text-mid)]">
+                        {h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime())
+                          ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                          : '-'}
+                      </td>
                       <td className="py-1 text-right font-mono text-[var(--text)]">{isNumeric ? Number(h.value).toLocaleString() : h.value}</td>
                     </tr>
                   ))}
@@ -508,7 +522,7 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] w-full max-w-[480px] overflow-hidden shadow-2xl flex flex-col">
+      <div className="glass-card w-full max-w-[480px] overflow-hidden shadow-2xl flex flex-col">
         <div className="flex justify-between items-center p-5 border-b border-[var(--border)]">
           <h3 className="text-sm font-bold">Nova Coleta — {title}</h3>
           <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X size={16} /></button>
@@ -544,7 +558,7 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
 
 function KpiCard({ label, value, color }: any) {
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-[18px_20px]">
+    <div className="glass-card rounded-xl p-[18px_20px]">
       <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-1.5">{label}</div>
       <div className="text-xl font-extrabold" style={{ color }}>{value}</div>
     </div>
@@ -553,7 +567,7 @@ function KpiCard({ label, value, color }: any) {
 
 function BreakdownCard({ label, value, color }: any) {
   return (
-    <div className="bg-[var(--surface-high)] border border-[var(--border)] rounded-[10px] p-[14px_16px] border-t-[2px]" style={{ borderTopColor: color }}>
+    <div className="glass-card rounded-[10px] p-[14px_16px] border-t-[2px]" style={{ borderTopColor: color }}>
       <div className="text-[11px] text-[var(--text-mid)] mb-1">{label}</div>
       <div className="text-lg font-extrabold" style={{ color }}>{fmtShort(value)}</div>
     </div>
@@ -687,7 +701,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[16px] w-full max-w-[560px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="glass-card w-full max-w-[560px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-[20px_22px] border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
           <h3 className="m-0 text-[15px] font-bold">Nova Coleta — {project.name}</h3>
           <button onClick={onClose} className="bg-transparent border-none text-[var(--text-dim)] cursor-pointer hover:text-[var(--text)]">

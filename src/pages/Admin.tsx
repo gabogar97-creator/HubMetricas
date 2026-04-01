@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { useAppContext, RoiMethod } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { Navigate } from 'react-router-dom';
 
 export function Admin() {
+  const { profile } = useAuth();
+  
+  if (profile?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   console.log('--- Admin component starting render now (final check 2) ---');
   console.log('--- Admin component starting render now (final check) ---');
   console.log('--- Admin component starting render now ---');
@@ -154,7 +162,7 @@ export function Admin() {
 
       {activeTab === 'proj' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-[fadeIn_0.2s_ease]">
-          <div className="bg-[var(--bg3)] border border-[var(--border)] rounded-xl overflow-hidden">
+          <div className="glass-card overflow-hidden">
             <div className="p-4 border-b border-[var(--border)]">
               <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text2)] font-mono">Cadastrar Projeto</div>
             </div>
@@ -277,7 +285,7 @@ export function Admin() {
             </div>
           </div>
 
-          <div className="bg-[var(--bg3)] border border-[var(--border)] rounded-xl overflow-hidden">
+          <div className="glass-card overflow-hidden">
             <div className="p-4 border-b border-[var(--border)]">
               <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text2)] font-mono">Projetos Ativos</div>
             </div>
@@ -303,7 +311,7 @@ export function Admin() {
 
       {activeTab === 'nsm' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-[fadeIn_0.2s_ease]">
-          <div className="bg-[var(--bg3)] border border-[var(--border)] rounded-xl overflow-hidden">
+          <div className="glass-card overflow-hidden">
             <div className="p-4 border-b border-[var(--border)]">
               <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text2)] font-mono">Cadastrar Nova NSM</div>
             </div>
@@ -366,7 +374,7 @@ export function Admin() {
             </div>
           </div>
 
-          <div className="bg-[var(--bg3)] border border-[var(--border)] rounded-xl overflow-hidden">
+          <div className="glass-card overflow-hidden">
             <div className="p-4 border-b border-[var(--border)]">
               <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text2)] font-mono">NSMs Cadastradas</div>
             </div>

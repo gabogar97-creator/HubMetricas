@@ -1,18 +1,53 @@
-import React, { useState, useRef } from 'react';
-import { useUI } from '../context/UIContext';
-import { Camera, Save, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useAppContext } from '../context/AppContext';
+import { supabase } from '../lib/supabase';
+import { Camera, Save, User, Loader2 } from 'lucide-react';
 
 export function Profile() {
-  const { userProfile, updateUserProfile } = useUI();
-  const [name, setName] = useState(userProfile.name);
-  const [email, setEmail] = useState(userProfile.email);
-  const [role, setRole] = useState(userProfile.role);
-  const [photoUrl, setPhotoUrl] = useState(userProfile.photoUrl);
+  const { profile, user } = useAuth();
+  const { logAction } = useAppContext();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSave = () => {
-    updateUserProfile({ name, email, role, photoUrl });
-    alert('Perfil atualizado com sucesso!');
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '');
+      setRole(profile.role || 'viewer');
+      setPhotoUrl(profile.avatar_url || '');
+    }
+    if (user) {
+      setEmail(user.email || '');
+    }
+  }, [profile, user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ name, avatar_url: photoUrl })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      await logAction('UPDATE', 'Profile', user.id, profile, { name, avatar_url: photoUrl });
+      
+      setToast('Perfil atualizado com sucesso!');
+      setTimeout(() => setToast(null), 3000);
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      setToast('Erro ao atualizar perfil.');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,7 +63,7 @@ export function Profile() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-[fadeIn_0.2s_ease]">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
+      <div className="glass-card overflow-hidden">
         <div className="p-6 border-b border-[var(--border)]">
           <h2 className="text-lg font-bold text-[var(--text)]">Configurações de Perfil</h2>
           <p className="text-sm text-[var(--text-dim)] mt-1">Atualize suas informações pessoais e foto de perfil.</p>
@@ -60,8 +95,8 @@ export function Profile() {
               />
             </div>
             <div className="flex-1 text-center sm:text-left">
-              <h3 className="text-base font-semibold text-[var(--text)]">{userProfile.name}</h3>
-              <p className="text-sm text-[var(--text-dim)]">{userProfile.role}</p>
+              <h3 className="text-base font-semibold text-[var(--text)]">{name || 'Usuário'}</h3>
+              <p className="text-sm text-[var(--text-dim)] capitalize">{role}</p>
             </div>
           </div>
 
@@ -81,8 +116,8 @@ export function Profile() {
               <input 
                 type="email" 
                 value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                disabled
+                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans outline-none opacity-70 cursor-not-allowed"
               />
             </div>
 
@@ -91,8 +126,8 @@ export function Profile() {
               <input 
                 type="text" 
                 value={role} 
-                onChange={e => setRole(e.target.value)} 
-                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                disabled
+                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans outline-none opacity-70 cursor-not-allowed capitalize"
               />
             </div>
           </div>
@@ -100,13 +135,20 @@ export function Profile() {
           <div className="pt-6 flex justify-end">
             <button 
               onClick={handleSave} 
-              className="flex items-center gap-2 px-6 py-2.5 rounded-md text-[13px] font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
+              disabled={loading}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-md text-[13px] font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors disabled:opacity-70"
             >
-              <Save size={16} />
-              Salvar Alterações
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
           </div>
         </div>
+      </div>
+      
+      {/* Toast */}
+      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#161b22] border border-[#30363d] rounded-[10px] p-[12px_20px] text-[13px] text-[#e6edf3] shadow-[0_8px_30px_rgba(0,0,0,0.4)] flex items-center gap-2.5 z-[99] transition-all duration-300 ${toast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 pointer-events-none'}`}>
+        <div className={`w-2 h-2 rounded-full ${toast?.includes('Erro') ? 'bg-red-500' : 'bg-[#3fb950]'}`}></div>
+        <span>{toast}</span>
       </div>
     </div>
   );
