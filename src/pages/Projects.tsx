@@ -237,7 +237,7 @@ export function Projects() {
             />
             <KpiCard
               label="ROI"
-              value={roiPercentage != null ? `${fmtPct(roiPercentage)} · ${fmtRatio(roiPercentage / 100)}` : "—"}
+              value={roiPercentage != null ? `${fmtPct(roiPercentage)} · ${fmtRatio(1 + roiPercentage / 100)}` : "—"}
               color={roiPercentage != null ? (roiPercentage >= 0 ? "var(--green)" : "var(--red)") : "var(--text-dim)"}
               helper="Quanto mais próximo do 0% ou 1, mais próximo do payback"
             />

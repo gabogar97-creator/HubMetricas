@@ -270,10 +270,16 @@ export function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
         <KpiCard label="Total de Investimento" value={fmtShort(totalInvestment)} sub={fmt(totalInvestment)} color="var(--red)" />
         <KpiCard label="Retorno do Investimento" value={fmtShort(totalReturn)} sub={fmt(totalReturn)} color="var(--green)" />
-        <KpiCard label="Payback do Investimento" value={fmtMonths(paybackMonths)} sub={paybackMonths ? `~${paybackMonths.toFixed(1)} meses` : "Sem retorno"} color="var(--yellow)" />
+        <KpiCard
+          label="Payback do Investimento"
+          value={fmtMonths(paybackMonths)}
+          sub={paybackMonths ? `~${paybackMonths.toFixed(1)} meses` : "Sem retorno"}
+          helper="Dado o retorno acumulado, obtemos a média mês de retorno, se mantido o custo, calculamos o payback acima"
+          color="var(--yellow)"
+        />
         <KpiCard
           label="ROI Global"
-          value={roiPercentage != null ? `${fmtPct(roiPercentage)} · ${fmtRatio(roiPercentage / 100)}` : "—"}
+          value={roiPercentage != null ? `${fmtPct(roiPercentage)} · ${fmtRatio(1 + roiPercentage / 100)}` : "—"}
           sub={`${validROI.length} projetos com dados`}
           helper="Quanto mais próximo do 0% ou 1, mais próximo do payback"
           color={roiPercentage != null && roiPercentage >= 0 ? "var(--green)" : "var(--red)"}
