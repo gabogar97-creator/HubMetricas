@@ -303,7 +303,7 @@ export function Dashboard() {
                 key={m.id ?? m.name}
                 type="button"
                 onClick={() => m.id != null && navigate(`/projects?projectId=${m.id}`)}
-                className="w-full text-left flex justify-between items-center glass-card p-2 rounded-lg"
+                className="w-full text-left flex justify-between items-center glass-card p-2 rounded-lg cursor-pointer border border-transparent hover:border-[var(--border2)] hover:bg-[var(--bg2)] transition-colors"
               >
                 <span className="text-xs text-[var(--text-mid)] truncate mr-2">{m.name}</span>
                 <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold shrink-0" style={{ background: m.roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)', color: m.roi >= 0 ? 'var(--green)' : 'var(--red)' }}>
