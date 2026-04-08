@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { Plus, X, FolderOpen, Edit2, Trash2, ArrowRight, ArrowLeft, Save, Clock } from 'lucide-react';
@@ -25,6 +26,7 @@ export function Projects() {
   const [selId, setSelId] = useState<number | 'global' | null>(null);
   const [wizard, setWizard] = useState(false);
   const [nsmWizard, setNsmWizard] = useState(false);
+  const location = useLocation();
 
   const getLatestAccumulatedValue = (rows: any[], type: string) => {
     const latest = (rows || [])
@@ -34,10 +36,21 @@ export function Projects() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const projectIdParam = params.get('projectId');
+
+    if (projectIdParam) {
+      const parsed = Number(projectIdParam);
+      if (!Number.isNaN(parsed) && projects.some(p => p.id === parsed)) {
+        setSelId(parsed);
+        return;
+      }
+    }
+
     if (projects.length > 0 && selId === null) {
       setSelId(projects[0].id);
     }
-  }, [projects, selId]);
+  }, [projects, selId, location.search]);
 
   const project = selId === 'global' ? null : projects.find(p => p.id === selId);
   const isGlobalMode = selId === 'global';

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { format, differenceInMonths } from 'date-fns';
@@ -19,6 +20,7 @@ export function Dashboard() {
   const [newNsmId, setNewNsmId] = useState('');
   const [newNsmDate, setNewNsmDate] = useState(new Date().toISOString().split('T')[0]);
   const [newNsmValue, setNewNsmValue] = useState('');
+  const navigate = useNavigate();
 
   const getLatestAccumulatedValue = (rows: any[], type: string) => {
     const latest = (rows || [])
@@ -108,12 +110,14 @@ export function Dashboard() {
         sumPayback += pPayback;
 
         projMetrics.push({
+          id: p.id,
           name: p.name,
           roi: pRoi,
           payback: pPayback
         });
       } else {
         projMetrics.push({
+          id: p.id,
           name: p.name,
           roi: null,
           payback: null
@@ -295,12 +299,17 @@ export function Dashboard() {
           </div>
           <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2">
             {projectMetrics.filter(x => x.roi != null).sort((a,b) => b.roi - a.roi).map((m) => (
-              <div key={m.name} className="flex justify-between items-center glass-card p-2 rounded-lg">
+              <button
+                key={m.id ?? m.name}
+                type="button"
+                onClick={() => m.id != null && navigate(`/projects?projectId=${m.id}`)}
+                className="w-full text-left flex justify-between items-center glass-card p-2 rounded-lg"
+              >
                 <span className="text-xs text-[var(--text-mid)] truncate mr-2">{m.name}</span>
                 <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold shrink-0" style={{ background: m.roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)', color: m.roi >= 0 ? 'var(--green)' : 'var(--red)' }}>
                   {fmtPct(m.roi)}
                 </span>
-              </div>
+              </button>
             ))}
             {projectMetrics.filter(x => x.roi === null).map((m) => (
               <div key={m.name} className="flex justify-between items-center glass-card p-2 rounded-lg">
