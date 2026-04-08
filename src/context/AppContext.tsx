@@ -95,6 +95,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [hasNewLogs, setHasNewLogs] = useState(false);
   const { user } = useAuth();
 
+  const mapNsm = (n: any): NSM => ({
+    ...n,
+    projectId: n.project_id,
+    CollectionNSMs: (n.collection_nsms || n.CollectionNSMs || []).map((c: any) => ({
+      ...c,
+      nsmId: c.nsm_id ?? c.nsmId
+    }))
+  });
+
+  const mapProject = (p: any): Project => ({
+    ...p,
+    goLiveDate: p.go_live_date,
+    monthlyCapacity: p.monthly_capacity,
+    monthlySquadCost: p.monthly_squad_cost,
+    formulaType: p.formula_type,
+    costFormula: p.cost_formula,
+    returnFormula: p.return_formula,
+    roiMethods: p.roi_methods,
+    CollectionROIs: (p.collection_rois || p.CollectionROIs || []).map((r: any) => ({
+      ...r,
+      projectId: r.project_id,
+      accumulatedQuantity: r.accumulated_quantity,
+      hourlyRate: r.hourly_rate,
+      totalValue: r.total_value
+    })),
+    NSMs: (p.nsms || p.NSMs || []).map((n: any) => mapNsm(n))
+  });
+
   const clearNewLogs = () => setHasNewLogs(false);
 
   const logAction = async (action: string, entity: string, entityId?: string, oldValue?: any, newValue?: any) => {
@@ -122,20 +150,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     console.log('--- refreshData function starting ---');
     console.log('Starting refreshData function...');
     console.log('refreshData function called...');
-    console.log('Fetching data from backend...');
+    console.log('Fetching data from Supabase...');
     try {
       const [projRes, nsmRes] = await Promise.all([
-        fetch('/api/projects'),
-        fetch('/api/nsm/global')
+        supabase
+          .from('projects')
+          .select(`
+            *,
+            collection_rois (*),
+            nsms (
+              *,
+              collection_nsms (*)
+            )
+          `),
+        supabase
+          .from('nsms')
+          .select(`*, collection_nsms (*)`)
+          .is('project_id', null)
       ]);
-      console.log('Project response status:', projRes.status);
-      console.log('NSM response status:', nsmRes.status);
-      const projData = await projRes.json();
-      const nsmData = await nsmRes.json();
+
+      if (projRes.error) {
+        console.error('Supabase error fetching projects:', projRes.error);
+        throw projRes.error;
+      }
+      if (nsmRes.error) {
+        console.error('Supabase error fetching global NSMs:', nsmRes.error);
+        throw nsmRes.error;
+      }
+
+      const projData = (projRes.data || []).map(mapProject);
+      const nsmData = (nsmRes.data || []).map(mapNsm);
       console.log('Fetched projects:', projData.length);
       console.log('Fetched global NSMs:', nsmData.length);
-      setProjects(Array.isArray(projData) ? projData : []);
-      setGlobalNSMs(Array.isArray(nsmData) ? nsmData : []);
+      setProjects(projData);
+      setGlobalNSMs(nsmData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -145,119 +193,222 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteProject = async (id: number) => {
     const project = projects.find(p => p.id === id);
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete project:', error);
+      throw error;
+    }
     await logAction('DELETE', 'Project', id.toString(), project);
     await refreshData();
   };
 
   const deleteCollectionROI = async (id: number) => {
-    await fetch(`/api/collections/roi/${id}`, { method: 'DELETE' });
+    const { error } = await supabase.from('collection_rois').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete collection ROI:', error);
+      throw error;
+    }
     await logAction('DELETE', 'CollectionROI', id.toString());
     await refreshData();
   };
 
   const deleteCollectionNSM = async (id: number) => {
-    await fetch(`/api/collections/nsm/${id}`, { method: 'DELETE' });
+    const { error } = await supabase.from('collection_nsms').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete collection NSM:', error);
+      throw error;
+    }
     await logAction('DELETE', 'CollectionNSM', id.toString());
     await refreshData();
   };
 
   const deleteNSM = async (id: number) => {
     const nsm = globalNSMs.find(n => n.id === id) || projects.flatMap(p => p.NSMs).find(n => n.id === id);
-    await fetch(`/api/nsm/${id}`, { method: 'DELETE' });
+    const { error } = await supabase.from('nsms').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete NSM:', error);
+      throw error;
+    }
     await logAction('DELETE', 'NSM', id.toString(), nsm);
     await refreshData();
   };
 
   const updateProject = async (id: number, data: any) => {
     const oldProject = projects.find(p => p.id === id);
-    await fetch(`/api/projects/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    const payload: any = {
+      name: data.name,
+      go_live_date: data.goLiveDate,
+      monthly_capacity: data.monthlyCapacity,
+      monthly_squad_cost: data.monthlySquadCost,
+      formula_type: data.formulaType,
+      status: data.status,
+      cost_formula: data.costFormula,
+      return_formula: data.returnFormula,
+      roi_methods: data.roiMethods
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { error } = await supabase.from('projects').update(payload).eq('id', id);
+    if (error) {
+      console.error('Failed to update project:', error);
+      throw error;
+    }
     await logAction('UPDATE', 'Project', id.toString(), oldProject, data);
     await refreshData();
   };
   
   const addProject = async (data: any) => {
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const newProject = await res.json();
-    await logAction('CREATE', 'Project', newProject.id?.toString(), null, data);
+    const payload: any = {
+      name: data.name,
+      go_live_date: data.goLiveDate,
+      monthly_capacity: data.monthlyCapacity,
+      monthly_squad_cost: data.monthlySquadCost,
+      formula_type: data.formulaType,
+      status: data.status,
+      cost_formula: data.costFormula,
+      return_formula: data.returnFormula,
+      roi_methods: data.roiMethods
+    };
+    const { data: newProject, error } = await supabase
+      .from('projects')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to create project:', error);
+      throw error;
+    }
+
+    await logAction('CREATE', 'Project', newProject?.id?.toString(), null, data);
     await refreshData();
   };
 
   const updateCollectionROI = async (id: number, data: any) => {
-    await fetch(`/api/collections/roi/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    const payload: any = {
+      date: data.date,
+      type: data.type,
+      description: data.description,
+      accumulated_quantity: data.accumulatedQuantity,
+      hours: data.hours,
+      hourly_rate: data.hourlyRate,
+      total_value: data.totalValue,
+      custom_data: data.customData
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { error } = await supabase.from('collection_rois').update(payload).eq('id', id);
+    if (error) {
+      console.error('Failed to update collection ROI:', error);
+      throw error;
+    }
     await logAction('UPDATE', 'CollectionROI', id.toString(), null, data);
     await refreshData();
   };
 
   const updateCollectionNSM = async (id: number, data: any) => {
-    await fetch(`/api/collections/nsm/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    const payload: any = {
+      date: data.date,
+      value: data.value
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { error } = await supabase.from('collection_nsms').update(payload).eq('id', id);
+    if (error) {
+      console.error('Failed to update collection NSM:', error);
+      throw error;
+    }
     await logAction('UPDATE', 'CollectionNSM', id.toString(), null, data);
     await refreshData();
   };
 
   const updateNSM = async (id: number, data: any) => {
     const oldNsm = globalNSMs.find(n => n.id === id) || projects.flatMap(p => p.NSMs).find(n => n.id === id);
-    await fetch(`/api/nsm/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    const payload: any = {
+      name: data.name,
+      type: data.type,
+      target: data.target
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { error } = await supabase.from('nsms').update(payload).eq('id', id);
+    if (error) {
+      console.error('Failed to update NSM:', error);
+      throw error;
+    }
     await logAction('UPDATE', 'NSM', id.toString(), oldNsm, data);
     await refreshData();
   };
 
   const addCollectionROI = async (data: any) => {
-    const res = await fetch(`/api/collections/roi`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const newRoi = await res.json();
-    await logAction('CREATE', 'CollectionROI', newRoi.id?.toString(), null, data);
+    const payload: any = {
+      project_id: data.projectId,
+      date: data.date,
+      type: data.type,
+      description: data.description,
+      accumulated_quantity: data.accumulatedQuantity,
+      hours: data.hours,
+      hourly_rate: data.hourlyRate,
+      total_value: data.totalValue,
+      custom_data: data.customData
+    };
+    const { data: newRoi, error } = await supabase
+      .from('collection_rois')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to create collection ROI:', error);
+      throw error;
+    }
+
+    await logAction('CREATE', 'CollectionROI', newRoi?.id?.toString(), null, data);
     await refreshData();
   };
 
   const addNSM = async (data: any) => {
-    const res = await fetch(`/api/nsm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const newNsm = await res.json();
-    await logAction('CREATE', 'NSM', newNsm.id?.toString(), null, data);
+    const payload: any = {
+      project_id: data.projectId ?? null,
+      name: data.name,
+      type: data.type,
+      target: data.target
+    };
+    const { data: newNsm, error } = await supabase
+      .from('nsms')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to create NSM:', error);
+      throw error;
+    }
+
+    await logAction('CREATE', 'NSM', newNsm?.id?.toString(), null, data);
     await refreshData();
   };
 
   const addCollectionNSM = async (data: any) => {
-    const res = await fetch(`/api/collections/nsm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const newCol = await res.json();
-    await logAction('CREATE', 'CollectionNSM', newCol.id?.toString(), null, data);
+    const payload: any = {
+      nsm_id: data.nsmId,
+      date: data.date,
+      value: data.value
+    };
+    const { data: newCol, error } = await supabase
+      .from('collection_nsms')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to create collection NSM:', error);
+      throw error;
+    }
+
+    await logAction('CREATE', 'CollectionNSM', newCol?.id?.toString(), null, data);
     await refreshData();
   };
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [user?.id]);
 
   return (
     <AppContext.Provider value={{
