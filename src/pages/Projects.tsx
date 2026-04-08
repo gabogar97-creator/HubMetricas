@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { Plus, X, FolderOpen, Edit2, Trash2, ArrowRight, ArrowLeft, Save, Clock } from 'lucide-react';
-import { format, differenceInMonths } from 'date-fns';
+import { addMonths, format, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -11,6 +11,7 @@ const fmtShort = (n: number | null) => { if (n == null || isNaN(n)) return "—"
 const fmtPct = (n: number | null) => n == null || isNaN(n) ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 const fmtDate = (d: string | null) => { if (!d) return "—"; const [y, m, day] = d.split("T")[0].split("-"); return `${day}/${m}/${y}`; };
 const fmtMonths = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : `${Math.round(n)} meses`;
+const fmtRatio = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2).replace('.', ',');
 
 export function Projects() {
   console.log('--- Projects component starting render now (final check 2) ---');
@@ -49,13 +50,15 @@ export function Projects() {
     totalRevenue,
     roiPercentage,
     paybackMonths,
+    paybackMonthLabel,
+    nsmSeriesLabel,
     chartData,
     nsmChartData,
     pc
   } = useMemo(() => {
     if (!project) return {
       totalInvestment: 0, totalReturn: 0, totalSaving: 0, totalCostAvoidance: 0,
-      totalRevenue: 0, roiPercentage: null, paybackMonths: null, chartData: [], nsmChartData: [], pc: []
+      totalRevenue: 0, roiPercentage: null, paybackMonths: null, nsmSeriesLabel: null, chartData: [], nsmChartData: [], pc: []
     };
 
     let inv = 0;
@@ -106,9 +109,11 @@ export function Projects() {
     const cData = Object.values(monthlyData);
 
     const nsmData: Record<string, any> = {};
+    const nsmNames = new Set<string>();
     project.NSMs?.forEach(nsm => {
       const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
       if (!isNumeric) return;
+      if (nsm.name) nsmNames.add(nsm.name);
       
       nsm.CollectionNSMs?.forEach(col => {
         if (!col.date) return;
@@ -143,6 +148,10 @@ export function Projects() {
     const avgMonthlyRet = retAcc / months;
     const pPayback = avgMonthlyRet > 0 ? invAcc / avgMonthlyRet : null;
 
+    const paybackDate = pPayback != null ? addMonths(firstDate, Math.round(pPayback)) : null;
+    const paybackMonthLabel = paybackDate ? format(paybackDate, 'MMM/yy', { locale: ptBR }) : null;
+    const nsmSeriesLabel = nsmNames.size === 1 ? Array.from(nsmNames)[0] : (nsmNames.size > 1 ? 'Média (NSMs)' : null);
+
     return {
       totalInvestment: invAcc,
       totalReturn: retAcc,
@@ -151,6 +160,8 @@ export function Projects() {
       totalRevenue: revAcc,
       roiPercentage: pRoi,
       paybackMonths: pPayback,
+      paybackMonthLabel,
+      nsmSeriesLabel,
       chartData: cData,
       nsmChartData: nData,
       pc: sortedPc
@@ -216,17 +227,27 @@ export function Projects() {
 
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Total de Investimento" value={fmtShort(totalInvestment)} color="var(--red)" />
-            <KpiCard label="Retorno do Investimento" value={fmtShort(totalReturn)} color="var(--green)" />
-            <KpiCard label="Payback do Investimento" value={fmtMonths(paybackMonths)} color="var(--yellow)" />
-            <KpiCard label="ROI" value={roiPercentage != null ? fmtPct(roiPercentage) : "—"} color={roiPercentage != null ? (roiPercentage >= 0 ? "var(--green)" : "var(--red)") : "var(--text-dim)"} />
+            <KpiCard label="Total de Investimento" value={fmtShort(totalInvestment)} color="var(--red)" helper="O custo total do projeto acumulado" />
+            <KpiCard label="Retorno do Investimento" value={fmtShort(totalReturn)} color="var(--green)" helper="O total de retorno, considerando saving, custo evitado e receita" />
+            <KpiCard
+              label="Payback do Investimento"
+              value={paybackMonths === 0 ? 'Payback obtido' : (paybackMonths != null ? `${Math.round(paybackMonths)} meses${paybackMonthLabel ? ` · ${paybackMonthLabel}` : ''}` : "—")}
+              color={paybackMonths === 0 ? 'var(--green)' : 'var(--yellow)'}
+              helper="Dado o retorno acumulado, obtemos a média mês de retorno, se mantido o custo, calculamos o payback acima"
+            />
+            <KpiCard
+              label="ROI"
+              value={roiPercentage != null ? `${fmtPct(roiPercentage)} · ${fmtRatio(roiPercentage / 100)}` : "—"}
+              color={roiPercentage != null ? (roiPercentage >= 0 ? "var(--green)" : "var(--red)") : "var(--text-dim)"}
+              helper="Quanto mais próximo do 0% ou 1, mais próximo do payback"
+            />
           </div>
 
           {/* Breakdown */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <BreakdownCard label="Total de Saving" value={totalSaving} color="var(--saving)" />
-            <BreakdownCard label="Custo Evitado" value={totalCostAvoidance} color="var(--custo-evitado)" />
-            <BreakdownCard label="Total de Receita" value={totalRevenue} color="var(--receita)" />
+            <BreakdownCard label="Total de Saving" value={totalSaving} color="var(--saving)" helper="Custo existente e reduzido pelo projeto" />
+            <BreakdownCard label="Custo Evitado" value={totalCostAvoidance} color="var(--custo-evitado)" helper="Custo não existente, mas potencialmente necessário, evitado pelo projeto" />
+            <BreakdownCard label="Total de Receita" value={totalRevenue} color="var(--receita)" helper="Receita obtida diretamente pelo projeto" />
             <BreakdownCard label="Total de Custo" value={totalInvestment} color="var(--red)" />
           </div>
 
@@ -252,6 +273,9 @@ export function Projects() {
               <div className="glass-card rounded-xl p-[18px_20px]">
                 <div className="flex justify-between items-center mb-3.5">
                   <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Evolução da NSM</div>
+                  {nsmSeriesLabel && (
+                    <div className="text-[11px] text-[var(--text-dim)] truncate max-w-[220px]">{nsmSeriesLabel}</div>
+                  )}
                 </div>
                 {nsmChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={180}>
@@ -572,20 +596,26 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
   );
 }
 
-function KpiCard({ label, value, color }: any) {
+function KpiCard({ label, value, color, helper }: any) {
   return (
     <div className="glass-card rounded-xl p-[18px_20px]">
       <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-1.5">{label}</div>
       <div className="text-xl font-extrabold" style={{ color }}>{value}</div>
+      {helper && (
+        <div className="text-[11px] text-[var(--text-dim)] mt-2 leading-snug">{helper}</div>
+      )}
     </div>
   );
 }
 
-function BreakdownCard({ label, value, color }: any) {
+function BreakdownCard({ label, value, color, helper }: any) {
   return (
     <div className="glass-card rounded-[10px] p-[14px_16px] border-t-[2px]" style={{ borderTopColor: color }}>
       <div className="text-[11px] text-[var(--text-mid)] mb-1">{label}</div>
       <div className="text-lg font-extrabold" style={{ color }}>{fmtShort(value)}</div>
+      {helper && (
+        <div className="text-[11px] text-[var(--text-dim)] mt-1 leading-snug">{helper}</div>
+      )}
     </div>
   );
 }

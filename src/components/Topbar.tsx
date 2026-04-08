@@ -42,11 +42,11 @@ export function Topbar() {
   const getPageInfo = () => {
     switch (location.pathname) {
       case '/': return { title: 'Dashboard Geral', sub: 'Visão Geral' };
-      case '/projects': return { title: 'Projetos & ROI', sub: 'Análise por Projeto' };
+      case '/projects': return { title: 'Projetos', sub: 'Análise por Projeto' };
       case '/admin': return { title: 'Painel Admin', sub: 'Configuração' };
       case '/logs': return { title: 'Logs / Auditoria', sub: 'Rastreabilidade' };
       case '/profile': return { title: 'Configurações de Perfil', sub: 'Minha Conta' };
-      default: return { title: 'Spot Hub', sub: '' };
+      default: return { title: 'Hub de Métricas', sub: '' };
     }
   };
 
@@ -66,7 +66,7 @@ export function Topbar() {
         <div>
           <div className="text-[15px] font-semibold text-[var(--text)]">{title}</div>
           <div className="text-xs text-[var(--text3)]">
-            Spot Hub <span className="text-[var(--text3)]">›</span> {sub}
+            Hub de Métricas <span className="text-[var(--text3)]">›</span> {sub}
           </div>
         </div>
       </div>
@@ -79,7 +79,7 @@ export function Topbar() {
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <div className="font-mono text-[11px] text-[var(--text3)] bg-[var(--glass-bg)] backdrop-blur-sm px-3 py-1.5 rounded border border-[var(--glass-border)]">
+        <div className="text-[11px] text-[var(--text3)] bg-[var(--glass-bg)] backdrop-blur-sm px-3 py-1.5 rounded border border-[var(--glass-border)]">
           {format(new Date(), "dd MMM yyyy", { locale: ptBR })}
         </div>
       </div>

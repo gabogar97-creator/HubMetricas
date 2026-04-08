@@ -9,6 +9,7 @@ const fmt = (n: number | null) => n == null || isNaN(n) ? "R$ —" : new Intl.Nu
 const fmtShort = (n: number | null) => { if (n == null || isNaN(n)) return "—"; const a = Math.abs(n); if (a >= 1e6) return `R$ ${(n/1e6).toFixed(1)}M`; if (a >= 1e3) return `R$ ${(n/1e3).toFixed(1)}K`; return fmt(n); };
 const fmtPct = (n: number | null) => n == null || isNaN(n) ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
 const fmtMonths = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : `${Math.round(n)} meses`;
+const fmtRatio = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2).replace('.', ',');
 
 export function Dashboard() {
   const { projects, globalNSMs, refreshData, addCollectionNSM } = useAppContext();
@@ -58,6 +59,7 @@ export function Dashboard() {
     avgPaybackPerProject,
     projectMetrics
   } = useMemo(() => {
+    const paybackStartDate = new Date('2025-10-01T00:00:00');
     let inv = 0;
     let ret = 0;
     let sav = 0;
@@ -120,8 +122,8 @@ export function Dashboard() {
     });
 
     const overallRoi = inv > 0 ? ((ret - inv) / inv) * 100 : (ret > 0 ? null : null);
-    const overallMonths = 12; // simplified
-    const overallAvgMonthlyRet = ret / overallMonths;
+    const monthsSinceStart = Math.max(1, differenceInMonths(new Date(), paybackStartDate) || 1);
+    const overallAvgMonthlyRet = ret / monthsSinceStart;
     const overallPayback = overallAvgMonthlyRet > 0 ? inv / overallAvgMonthlyRet : null;
 
     return {
@@ -269,7 +271,13 @@ export function Dashboard() {
         <KpiCard label="Total de Investimento" value={fmtShort(totalInvestment)} sub={fmt(totalInvestment)} color="var(--red)" />
         <KpiCard label="Retorno do Investimento" value={fmtShort(totalReturn)} sub={fmt(totalReturn)} color="var(--green)" />
         <KpiCard label="Payback do Investimento" value={fmtMonths(paybackMonths)} sub={paybackMonths ? `~${paybackMonths.toFixed(1)} meses` : "Sem retorno"} color="var(--yellow)" />
-        <KpiCard label="ROI Global" value={roiPercentage != null ? fmtPct(roiPercentage) : "—"} sub={`${validROI.length} projetos com dados`} color={roiPercentage != null && roiPercentage >= 0 ? "var(--green)" : "var(--red)"} />
+        <KpiCard
+          label="ROI Global"
+          value={roiPercentage != null ? `${fmtPct(roiPercentage)} · ${fmtRatio(roiPercentage / 100)}` : "—"}
+          sub={`${validROI.length} projetos com dados`}
+          helper="Quanto mais próximo do 0% ou 1, mais próximo do payback"
+          color={roiPercentage != null && roiPercentage >= 0 ? "var(--green)" : "var(--red)"}
+        />
       </div>
 
       {/* Row 2 — Averages */}
@@ -521,13 +529,16 @@ export function Dashboard() {
   );
 }
 
-function KpiCard({ label, value, sub, color }: any) {
+function KpiCard({ label, value, sub, helper, color }: any) {
   return (
     <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] overflow-hidden relative group">
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
       <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2 relative z-10">{label}</div>
       <div className="text-xl sm:text-[22px] font-extrabold leading-none relative z-10" style={{ color }}>{value}</div>
       <div className="text-[11px] text-[var(--text-dim)] mt-1.5 relative z-10">{sub}</div>
+      {helper && (
+        <div className="text-[11px] text-[var(--text-dim)] mt-2 leading-snug relative z-10">{helper}</div>
+      )}
     </div>
   );
 }

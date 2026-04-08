@@ -20,35 +20,27 @@ export function Sidebar() {
   const navigate = useNavigate();
   
   return (
-    <aside className={`w-[220px] min-h-screen bg-[var(--glass-bg)] backdrop-blur-xl border-r border-[var(--glass-border)] flex flex-col fixed top-0 left-0 z-50 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className="p-6 border-b border-[var(--glass-border)]">
+    <aside className={`w-[220px] min-h-screen text-white flex flex-col fixed top-0 left-0 z-50 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ background: 'linear-gradient(180deg, #1e3a8a 0%, #0b0f19 65%, #000000 100%)' }}>
+      <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center font-mono text-xs font-bold tracking-tight text-white shadow-[0_0_15px_rgba(77,148,255,0.4)] shrink-0">
-            SH
-          </div>
           <div className="leading-none">
-            <div className="font-sans text-[15px] font-bold text-[var(--text)] tracking-tight">Spot Hub</div>
-            <div className="text-[10px] text-[var(--text3)] tracking-widest uppercase mt-1">Zucchetti</div>
+            <div className="font-sans text-[15px] font-bold tracking-tight">Hub de Métricas</div>
+            <div className="text-[10px] text-white/70 tracking-widest uppercase mt-1">Zucchetti</div>
           </div>
         </div>
       </div>
       
       <nav className="flex-1 py-3 overflow-y-auto">
-        <div className="px-5 py-2 text-[9px] tracking-widest uppercase text-[var(--text3)] font-mono">Principal</div>
         <NavItem to="/" icon={<Hexagon size={16} />} label="Dashboard" />
-        
-        <div className="px-5 py-2 mt-2 text-[9px] tracking-widest uppercase text-[var(--text3)] font-mono">Módulos</div>
-        <NavItem to="/projects" icon={<LayoutDashboard size={16} />} label="Projetos / ROI" />
-
-        <div className="px-5 py-2 mt-2 text-[9px] tracking-widest uppercase text-[var(--text3)] font-mono">Configuração</div>
+        <NavItem to="/projects" icon={<LayoutDashboard size={16} />} label="Projetos" />
         <NavItem to="/admin" icon={<Settings size={16} />} label="Cadastro" />
         <NavItem to="/logs" icon={<Activity size={16} />} label="Logs / Auditoria" hasNotification={hasNewLogs} />
       </nav>
 
-      <div className="p-4 border-t border-[var(--glass-border)]">
+      <div className="p-4 border-t border-white/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[var(--bg4)] border border-[var(--glass-border)] rounded-full flex items-center justify-center text-xs font-mono text-[var(--accent)] overflow-hidden">
+            <div className="w-8 h-8 bg-white/10 border border-white/10 rounded-full flex items-center justify-center text-xs font-mono text-white overflow-hidden">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -56,14 +48,14 @@ export function Sidebar() {
               )}
             </div>
             <div>
-              <div className="text-xs font-medium text-[var(--text)]">{profile?.name || 'Usuário'}</div>
-              <div className="text-[10px] text-[var(--text3)] capitalize">{profile?.role || 'viewer'}</div>
+              <div className="text-xs font-medium text-white">{profile?.name || 'Usuário'}</div>
+              <div className="text-[10px] text-white/70 capitalize">{profile?.role || 'viewer'}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/profile')}
-              className="text-[var(--text3)] hover:text-[var(--accent)] transition-colors p-1" 
+              className="text-white/70 hover:text-white transition-colors p-1" 
               title="Configurações de Perfil"
             >
               <UserCog size={16} />
@@ -73,7 +65,7 @@ export function Sidebar() {
                 await signOut();
                 navigate('/login');
               }}
-              className="text-[var(--text3)] hover:text-[var(--red)] transition-colors p-1" 
+              className="text-white/70 hover:text-white transition-colors p-1" 
               title="Sair"
             >
               <LogOut size={16} />
@@ -92,8 +84,8 @@ function NavItem({ to, icon, label, badge, hasNotification }: { to: string; icon
       className={({ isActive }) =>
         `flex items-center gap-3 px-5 py-2.5 text-[13px] font-medium transition-all relative mx-2 rounded-lg mb-1 ${
           isActive
-            ? 'bg-[var(--accent)] text-white shadow-[0_0_15px_rgba(77,148,255,0.2)]'
-            : 'text-[var(--text2)] hover:bg-[var(--bg3)] hover:text-[var(--text)]'
+            ? 'bg-white/15 text-white shadow-[0_0_18px_rgba(59,130,246,0.25)]'
+            : 'text-white/80 hover:bg-white/10 hover:text-white'
         }`
       }
     >
