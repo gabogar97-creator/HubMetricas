@@ -19,6 +19,13 @@ export function Dashboard() {
   const [newNsmDate, setNewNsmDate] = useState(new Date().toISOString().split('T')[0]);
   const [newNsmValue, setNewNsmValue] = useState('');
 
+  const getLatestAccumulatedValue = (rows: any[], type: string) => {
+    const latest = (rows || [])
+      .filter((r: any) => r?.type === type && r?.totalValue != null && !isNaN(Number(r.totalValue)))
+      .sort((a: any, b: any) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))[0];
+    return latest ? Number(latest.totalValue) : 0;
+  };
+
   const handleSaveNsmValue = async () => {
     if (!newNsmId || !newNsmDate || !newNsmValue) return;
     await addCollectionNSM({
@@ -63,11 +70,11 @@ export function Dashboard() {
     const projMetrics: any[] = [];
 
     projects.forEach(p => {
-      let pInv = 0;
-      let pRet = 0;
-      let pSav = 0;
-      let pCa = 0;
-      let pRev = 0;
+      const pInv = getLatestAccumulatedValue(p.CollectionROIs, 'Custo');
+      const pSav = getLatestAccumulatedValue(p.CollectionROIs, 'Saving');
+      const pCa = getLatestAccumulatedValue(p.CollectionROIs, 'Cost Avoidance');
+      const pRev = getLatestAccumulatedValue(p.CollectionROIs, 'Revenue');
+      const pRet = pSav + pCa + pRev;
 
       let firstDate = new Date();
       let lastDate = new Date();
@@ -80,15 +87,6 @@ export function Dashboard() {
         if (!hasCollections || d < firstDate) firstDate = d;
         if (!hasCollections || d > lastDate) lastDate = d;
         hasCollections = true;
-
-        if (roi.type === 'Custo') {
-          pInv += roi.totalValue;
-        } else {
-          pRet += roi.totalValue;
-          if (roi.type === 'Saving') pSav += roi.totalValue;
-          if (roi.type === 'Cost Avoidance') pCa += roi.totalValue;
-          if (roi.type === 'Revenue') pRev += roi.totalValue;
-        }
       });
 
       inv += pInv;

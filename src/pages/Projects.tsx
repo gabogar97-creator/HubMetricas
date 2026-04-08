@@ -25,6 +25,13 @@ export function Projects() {
   const [wizard, setWizard] = useState(false);
   const [nsmWizard, setNsmWizard] = useState(false);
 
+  const getLatestAccumulatedValue = (rows: any[], type: string) => {
+    const latest = (rows || [])
+      .filter((r: any) => r?.type === type && r?.totalValue != null && !isNaN(Number(r.totalValue)))
+      .sort((a: any, b: any) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))[0];
+    return latest ? Number(latest.totalValue) : 0;
+  };
+
   useEffect(() => {
     if (projects.length > 0 && selId === null) {
       setSelId(projects[0].id);
@@ -65,6 +72,12 @@ export function Projects() {
 
     const projectCollections = project.CollectionROIs || [];
     const sortedPc = [...projectCollections].sort((a, b) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0));
+
+    const invAcc = getLatestAccumulatedValue(projectCollections, 'Custo');
+    const savAcc = getLatestAccumulatedValue(projectCollections, 'Saving');
+    const caAcc = getLatestAccumulatedValue(projectCollections, 'Cost Avoidance');
+    const revAcc = getLatestAccumulatedValue(projectCollections, 'Revenue');
+    const retAcc = savAcc + caAcc + revAcc;
 
     sortedPc.forEach(col => {
       if (!col.date) return;
@@ -125,17 +138,17 @@ export function Projects() {
       return timeA - timeB;
     });
 
-    const pRoi = inv > 0 ? ((ret - inv) / inv) * 100 : (ret > 0 ? null : null);
+    const pRoi = invAcc > 0 ? ((retAcc - invAcc) / invAcc) * 100 : (retAcc > 0 ? null : null);
     const months = Math.max(1, differenceInMonths(lastDate, firstDate) || 1);
-    const avgMonthlyRet = ret / months;
-    const pPayback = avgMonthlyRet > 0 ? inv / avgMonthlyRet : null;
+    const avgMonthlyRet = retAcc / months;
+    const pPayback = avgMonthlyRet > 0 ? invAcc / avgMonthlyRet : null;
 
     return {
-      totalInvestment: inv,
-      totalReturn: ret,
-      totalSaving: sav,
-      totalCostAvoidance: ca,
-      totalRevenue: rev,
+      totalInvestment: invAcc,
+      totalReturn: retAcc,
+      totalSaving: savAcc,
+      totalCostAvoidance: caAcc,
+      totalRevenue: revAcc,
       roiPercentage: pRoi,
       paybackMonths: pPayback,
       chartData: cData,
@@ -521,13 +534,16 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="glass-card w-full max-w-[480px] overflow-hidden shadow-2xl flex flex-col">
-        <div className="flex justify-between items-center p-5 border-b border-[var(--border)]">
-          <h3 className="text-sm font-bold">Nova Coleta — {title}</h3>
-          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)]"><X size={16} /></button>
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="flex justify-between items-center p-5 sm:p-6 border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-bold truncate">Nova Coleta — {title}</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Preencha os valores e salve para registrar a coleta.</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"><X size={16} /></button>
         </div>
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider mb-1.5">Data da Coleta</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]" />
@@ -547,7 +563,7 @@ function NSMCollectionWizard({ nsms, title, onClose, onSave }: { nsms: any[], ti
             ))}
           </div>
         </div>
-        <div className="p-5 border-t border-[var(--border)] flex justify-end gap-3">
+        <div className="p-5 sm:p-6 border-t border-[var(--border)] flex justify-end gap-3 shrink-0 bg-[var(--surface)]">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-mid)] hover:text-[var(--text)]">Cancelar</button>
           <button onClick={handleSave} className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg text-sm font-bold hover:opacity-80 transition-opacity">Salvar Coletas</button>
         </div>
@@ -700,18 +716,18 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="glass-card w-full max-w-[560px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-[20px_22px] border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+      <div className="glass-card w-full max-w-[980px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="flex justify-between items-center p-[20px_22px] sm:p-[24px_26px] border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
           <h3 className="m-0 text-[15px] font-bold">Nova Coleta — {project.name}</h3>
           <button onClick={onClose} className="bg-transparent border-none text-[var(--text-dim)] cursor-pointer hover:text-[var(--text)]">
             <X size={16} />
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-[20px_22px]">
+        <div className="flex-1 overflow-y-auto p-[20px_22px] sm:p-[24px_26px]">
           {/* Stepper */}
-          <div className="flex mb-[22px] bg-[var(--surface-high)] rounded-[10px] overflow-hidden">
+          <div className="flex mb-[22px] bg-[var(--surface-high)] rounded-[12px] overflow-hidden border border-[var(--border)]">
             {steps.map((s, i) => (
               <div 
                 key={i} 
@@ -763,7 +779,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
           )}
         </div>
 
-        <div className="flex justify-between mt-[22px] pt-4 border-t border-[var(--border)] p-[0_22px_20px]">
+        <div className="flex justify-between mt-[22px] pt-4 border-t border-[var(--border)] p-[0_22px_20px] sm:p-[0_26px_24px] shrink-0 bg-[var(--surface)]">
           <button 
             type="button" 
             onClick={step === 0 ? onClose : handlePrev} 

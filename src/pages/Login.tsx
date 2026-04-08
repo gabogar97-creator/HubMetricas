@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from 'lucide-react';
+import zucchettiWhiteLogo from '../../assets/zucchetti-white.png';
 
 export function Login() {
   const [isRegister, setIsRegister] = useState(false);
@@ -182,13 +183,15 @@ export function Login() {
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.2)_0%,transparent_50%)] pointer-events-none"></div>
           
           <div className="max-w-[480px] mx-auto relative z-10">
-            <div className="flex items-center gap-4 mb-16">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center font-mono text-lg font-bold tracking-tight text-[#0f172a] shadow-lg shrink-0">
-                SH
-              </div>
+            <div className="flex flex-col items-start gap-4 mb-16">
+              <img
+                src={zucchettiWhiteLogo}
+                alt="Zucchetti"
+                className="h-10 w-auto"
+              />
               <div className="leading-tight">
-                <strong className="block text-xl font-bold text-white tracking-tight">Spot Hub</strong>
-                <span className="text-sm text-blue-200">Inteligência para seus projetos</span>
+                <strong className="block text-xl font-bold text-white tracking-tight">Hub de Métricas</strong>
+                <span className="text-sm text-blue-200">By Zucchetti Brasil</span>
               </div>
             </div>
 
@@ -206,11 +209,14 @@ export function Login() {
         <div className="flex flex-col items-center justify-center p-6 sm:p-8 md:p-12 bg-[var(--bg)] relative min-h-screen lg:min-h-0">
           {/* Mobile Branding - Only visible on small screens */}
           <div className="lg:hidden flex items-center gap-3 mb-8 sm:mb-10 w-full max-w-[380px]">
-            <div className="w-[32px] h-[32px] rounded-[8px] bg-[var(--accent)] flex items-center justify-center font-mono text-xs font-bold tracking-[-0.5px] text-white shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0">
-              SH
-            </div>
-            <div className="leading-none">
-              <strong className="block text-sm font-semibold tracking-[0.3px] text-[var(--text)]">Spot Hub</strong>
+            <img
+              src={zucchettiWhiteLogo}
+              alt="Zucchetti"
+              className="h-6 w-auto shrink-0"
+            />
+            <div className="leading-tight">
+              <strong className="block text-sm font-semibold tracking-[0.3px] text-[var(--text)]">Hub de Métricas</strong>
+              <span className="block text-xs text-[var(--text3)]">By Zucchetti Brasil</span>
             </div>
           </div>
 

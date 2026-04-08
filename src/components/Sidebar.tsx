@@ -39,14 +39,10 @@ export function Sidebar() {
         
         <div className="px-5 py-2 mt-2 text-[9px] tracking-widest uppercase text-[var(--text3)] font-mono">Módulos</div>
         <NavItem to="/projects" icon={<LayoutDashboard size={16} />} label="Projetos / ROI" />
-        
-        {profile?.role !== 'viewer' && (
-          <>
-            <div className="px-5 py-2 mt-2 text-[9px] tracking-widest uppercase text-[var(--text3)] font-mono">Configuração</div>
-            {profile?.role === 'admin' && <NavItem to="/admin" icon={<Settings size={16} />} label="Cadastro" />}
-            <NavItem to="/logs" icon={<Activity size={16} />} label="Logs / Auditoria" hasNotification={hasNewLogs} />
-          </>
-        )}
+
+        <div className="px-5 py-2 mt-2 text-[9px] tracking-widest uppercase text-[var(--text3)] font-mono">Configuração</div>
+        <NavItem to="/admin" icon={<Settings size={16} />} label="Cadastro" />
+        <NavItem to="/logs" icon={<Activity size={16} />} label="Logs / Auditoria" hasNotification={hasNewLogs} />
       </nav>
 
       <div className="p-4 border-t border-[var(--glass-border)]">
