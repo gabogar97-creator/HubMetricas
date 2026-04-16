@@ -152,38 +152,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
     console.log('refreshData function called...');
     console.log('Fetching data from Supabase...');
     try {
-      const [projRes, nsmRes] = await Promise.all([
-        supabase
-          .from('projects')
-          .select(`
-            *,
-            collection_rois (*),
-            nsms (
-              *,
-              collection_nsms (*)
-            )
-          `),
-        supabase
-          .from('nsms')
-          .select(`*, collection_nsms (*)`)
-          .is('project_id', null)
-      ]);
+      const projRes = await supabase
+        .from('projects')
+        .select(`
+          *,
+          collection_rois (*),
+          nsms (*)
+        `);
 
       if (projRes.error) {
         console.error('Supabase error fetching projects:', projRes.error);
         throw projRes.error;
       }
-      if (nsmRes.error) {
-        console.error('Supabase error fetching global NSMs:', nsmRes.error);
-        throw nsmRes.error;
+
+      const rawProjects = projRes.data || [];
+
+      const projectIds = rawProjects.map((p: any) => p.id).filter((id: any) => id != null);
+      const colRes = projectIds.length
+        ? await supabase
+            .from('collection_nsms')
+            .select('*')
+            .in('project_id', projectIds)
+        : { data: [], error: null as any };
+
+      if ((colRes as any).error) {
+        console.error('Supabase error fetching collection NSMs:', (colRes as any).error);
+        throw (colRes as any).error;
       }
 
-      const projData = (projRes.data || []).map(mapProject);
-      const nsmData = (nsmRes.data || []).map(mapNsm);
+      const collections = ((colRes as any).data || []) as any[];
+      const byProjectId = new Map<number, any[]>();
+      const byNsmId = new Map<number, any[]>();
+
+      collections.forEach((c: any) => {
+        if (c?.project_id != null) {
+          const pid = Number(c.project_id);
+          byProjectId.set(pid, [...(byProjectId.get(pid) || []), c]);
+        }
+        if (c?.nsm_id != null) {
+          const nid = Number(c.nsm_id);
+          byNsmId.set(nid, [...(byNsmId.get(nid) || []), c]);
+        }
+      });
+
+      const projData = rawProjects.map((p: any) => {
+        const mapped = mapProject(p);
+
+        const projectCollections = byProjectId.get(mapped.id) || [];
+        const hasNsmIdLink = mapped.NSMs?.some((n: any) => (byNsmId.get(n.id) || []).length > 0);
+
+        mapped.NSMs = (mapped.NSMs || []).map((n: any) => {
+          const direct = (byNsmId.get(n.id) || []).map((c: any) => ({
+            ...c,
+            nsmId: c.nsm_id ?? c.nsmId
+          }));
+
+          if (direct.length > 0) {
+            return { ...n, CollectionNSMs: direct };
+          }
+
+          if (!hasNsmIdLink && (mapped.NSMs || []).length === 1) {
+            const legacy = projectCollections.map((c: any) => ({
+              ...c,
+              nsmId: n.id
+            }));
+            return { ...n, CollectionNSMs: legacy };
+          }
+
+          return { ...n, CollectionNSMs: [] };
+        });
+
+        return mapped;
+      });
       console.log('Fetched projects:', projData.length);
-      console.log('Fetched global NSMs:', nsmData.length);
       setProjects(projData);
-      setGlobalNSMs(nsmData);
+      setGlobalNSMs([]);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -364,8 +407,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addNSM = async (data: any) => {
+    if (!data?.projectId) {
+      throw new Error('NSM must be linked to a project.');
+    }
     const payload: any = {
-      project_id: data.projectId ?? null,
+      project_id: data.projectId,
       name: data.name,
       type: data.type,
       target: data.target
@@ -386,11 +432,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addCollectionNSM = async (data: any) => {
+    const nsm = projects.flatMap(p => p.NSMs || []).find(n => n.id === data.nsmId);
     const payload: any = {
       nsm_id: data.nsmId,
+      project_id: nsm?.projectId,
       date: data.date,
       value: data.value
     };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
     const { data: newCol, error } = await supabase
       .from('collection_nsms')
       .insert([payload])

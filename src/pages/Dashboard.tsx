@@ -13,7 +13,7 @@ const fmtMonths = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? 
 const fmtRatio = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2).replace('.', ',');
 
 export function Dashboard() {
-  const { projects, globalNSMs, refreshData, addCollectionNSM } = useAppContext();
+  const { projects, refreshData, addCollectionNSM } = useAppContext();
   const [activeTab, setActiveTab] = useState<'roi' | 'nsm'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
   const [isNsmModalOpen, setIsNsmModalOpen] = useState(false);
@@ -45,9 +45,8 @@ export function Dashboard() {
     projects.forEach(p => {
       if (p.NSMs) p.NSMs.forEach(n => list.push({ ...n, projectName: p.name }));
     });
-    globalNSMs.forEach(n => list.push({ ...n, projectName: 'Global' }));
     return list;
-  }, [projects, globalNSMs]);
+  }, [projects]);
 
   const {
     totalInvestment,
@@ -211,8 +210,6 @@ export function Dashboard() {
         p.NSMs.forEach(nsm => processNsm(nsm, p.name));
       }
     });
-
-    globalNSMs.forEach(nsm => processNsm(nsm, 'Global'));
 
     const avgAchievement = totalNumericNsms > 0 ? sumAchievement / totalNumericNsms : 0;
 

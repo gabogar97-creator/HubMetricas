@@ -18,10 +18,8 @@ export function Admin() {
   console.log('Admin component rendering...');
   console.log('Rendering Admin...');
   const [activeTab, setActiveTab] = useState('proj');
-  const { projects, globalNSMs, refreshData, deleteProject, deleteCollectionNSM, updateProject, addProject, updateCollectionNSM, updateNSM, addNSM, deleteNSM } = useAppContext();
+  const { projects, refreshData, deleteProject, deleteCollectionNSM, updateProject, addProject, updateCollectionNSM, updateNSM, addNSM, deleteNSM } = useAppContext();
   
-  const [nsmLinkType, setNsmLinkType] = useState<'project' | 'global'>('project');
-
   // Project Form State
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [editingMethodId, setEditingMethodId] = useState<string | null>(null);
@@ -125,10 +123,10 @@ export function Admin() {
 
   const handleSaveNSM = async () => {
     if (!nsmName) return;
-    if (nsmLinkType === 'project' && !nsmProjectId) return;
+    if (!nsmProjectId) return;
 
     const data = {
-      projectId: nsmLinkType === 'project' ? Number(nsmProjectId) : null,
+      projectId: Number(nsmProjectId),
       name: nsmName,
       type: nsmType,
       target: nsmTarget,
@@ -146,7 +144,6 @@ export function Admin() {
 
   const handleEditNSM = (n: any) => {
     setEditingNsmId(n.id);
-    setNsmLinkType(n.projectId ? 'project' : 'global');
     setNsmProjectId(n.projectId ? n.projectId.toString() : '');
     setNsmName(n.name);
     setNsmType(n.type || 'number');
@@ -317,34 +314,14 @@ export function Admin() {
             </div>
             <div className="p-5 space-y-4">
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Vincular a</label>
-                <div className="flex gap-2 bg-[var(--bg4)] p-1 rounded-lg w-full">
-                  <button 
-                    onClick={() => setNsmLinkType('project')}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${nsmLinkType === 'project' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'}`}
-                  >
-                    Projeto
-                  </button>
-                  <button 
-                    onClick={() => setNsmLinkType('global')}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${nsmLinkType === 'global' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'}`}
-                  >
-                    Métrica Global
-                  </button>
-                </div>
+                <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Projeto</label>
+                <select value={nsmProjectId} onChange={(e) => setNsmProjectId(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors">
+                  <option value="" disabled>Selecione um projeto...</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
-              
-              {nsmLinkType === 'project' && (
-                <div className="space-y-1.5 animate-[fadeIn_0.2s_ease]">
-                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Projeto</label>
-                  <select value={nsmProjectId} onChange={(e) => setNsmProjectId(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors">
-                    <option value="" disabled>Selecione um projeto...</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
               <FormGroup label="Nome da Métrica (NSM)" placeholder="Ex: Leads Gerados, DAU, MAU" value={nsmName} onChange={(e: any) => setNsmName(e.target.value)} />
               <FormGroup label="Meta (Target)" placeholder="Ex: 1000, 50%" value={nsmTarget} onChange={(e: any) => setNsmTarget(e.target.value)} />
               <div className="space-y-1.5">
@@ -388,17 +365,6 @@ export function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {/* Global NSMs */}
-                  {globalNSMs.map(n => (
-                    <tr key={n.id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                      <td className="px-4 py-3 text-[var(--accent)] font-semibold">Global</td>
-                      <td className="px-4 py-3 font-mono text-[11px]">{n.name}</td>
-                      <td className="px-4 py-3 flex gap-3">
-                        <button onClick={() => handleEditNSM(n)} className="text-[var(--accent)] hover:text-[#33ddff] text-xs font-medium">Editar</button>
-                        <button onClick={() => deleteNSM(n.id)} className="text-[var(--red)] hover:text-[var(--red2)] text-xs font-medium">Excluir</button>
-                      </td>
-                    </tr>
-                  ))}
                   {/* Project NSMs */}
                   {projects.flatMap(p => (p.NSMs || []).map(n => (
                     <tr key={n.id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">

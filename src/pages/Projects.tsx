@@ -22,8 +22,8 @@ export function Projects() {
   console.log('Starting Projects component render...');
   console.log('Projects component rendering...');
   console.log('Rendering Projects...');
-  const { projects, globalNSMs, deleteCollectionROI, refreshData, addCollectionNSM, addCollectionROI } = useAppContext();
-  const [selId, setSelId] = useState<number | 'global' | null>(null);
+  const { projects, deleteCollectionROI, refreshData, addCollectionNSM, addCollectionROI } = useAppContext();
+  const [selId, setSelId] = useState<number | null>(null);
   const [wizard, setWizard] = useState(false);
   const [nsmWizard, setNsmWizard] = useState(false);
   const location = useLocation();
@@ -52,8 +52,7 @@ export function Projects() {
     }
   }, [projects, selId, location.search]);
 
-  const project = selId === 'global' ? null : projects.find(p => p.id === selId);
-  const isGlobalMode = selId === 'global';
+  const project = projects.find(p => p.id === selId);
 
   const {
     totalInvestment,
@@ -191,13 +190,10 @@ export function Projects() {
             value={selId || ''} 
             onChange={e => {
               const val = e.target.value;
-              setSelId(val === 'global' ? 'global' : Number(val));
+              setSelId(val ? Number(val) : null);
             }}
           >
             <option value="" disabled>Selecione um projeto...</option>
-            <optgroup label="Estratégico">
-              <option value="global">Métricas Globais (NSM)</option>
-            </optgroup>
             <optgroup label="Projetos">
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </optgroup>
@@ -205,35 +201,10 @@ export function Projects() {
         </div>
       </div>
 
-      {!project && !isGlobalMode ? (
+      {!project ? (
         <div className="glass-card rounded-xl text-center p-16 text-[var(--text-dim)]">
           <div className="flex justify-center mb-3"><FolderOpen size={40} className="text-[var(--text-dim)]" /></div>
           <div className="text-[15px] text-[var(--text-mid)] font-semibold">Selecione ou crie um projeto</div>
-        </div>
-      ) : isGlobalMode ? (
-        <div className="flex flex-col gap-4">
-          <div className="glass-card rounded-xl p-[18px_20px]">
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Métricas Globais (NSM)</div>
-              <button 
-                className="bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                onClick={() => setNsmWizard(true)}
-              >
-                <Plus size={14} /> Nova Coleta Global
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {globalNSMs.map(nsm => (
-                <NSMCard key={nsm.id} nsm={nsm} />
-              ))}
-              {globalNSMs.length === 0 && (
-                <div className="col-span-full text-center p-8 text-[var(--text-dim)] text-sm">
-                  Nenhuma Métrica Global cadastrada no Cadastro.
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -483,8 +454,8 @@ export function Projects() {
 
       {nsmWizard && (
         <NSMCollectionWizard 
-          nsms={isGlobalMode ? globalNSMs : (project?.NSMs || [])}
-          title={isGlobalMode ? "Métricas Globais" : `NSMs — ${project?.name}`}
+          nsms={project?.NSMs || []}
+          title={`NSMs — ${project?.name}`}
           onClose={() => setNsmWizard(false)}
           onSave={async (payloads) => {
             for (const p of payloads) {
