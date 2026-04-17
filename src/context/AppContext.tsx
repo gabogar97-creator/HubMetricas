@@ -94,6 +94,9 @@ interface AppContextType {
   deleteCollectionROI: (id: number) => Promise<void>;
   deleteCollectionNSM: (id: number) => Promise<void>;
   deleteNSM: (id: number) => Promise<void>;
+  deleteOKR: (id: number) => Promise<void>;
+  deleteOkrKeyResult: (id: number) => Promise<void>;
+  deleteCollectionOkrKeyResult: (id: number) => Promise<void>;
   updateProject: (id: number, data: any) => Promise<void>;
   addProject: (data: any) => Promise<void>;
   updateCollectionROI: (id: number, data: any) => Promise<void>;
@@ -173,6 +176,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to log action:', error);
     }
+  };
+
+  const deleteOKR = async (id: number) => {
+    const okr = okrs.find(o => o.id === id);
+    const { error } = await supabase.from('okrs').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete OKR:', error);
+      throw error;
+    }
+    await logAction('DELETE', 'OKR', id.toString(), okr);
+    await refreshData();
+  };
+
+  const deleteOkrKeyResult = async (id: number) => {
+    const kr = okrs.flatMap(o => o.KeyResults || []).find((k: any) => k.id === id);
+    const { error } = await supabase.from('okr_key_results').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete OKR Key Result:', error);
+      throw error;
+    }
+    await logAction('DELETE', 'OKRKeyResult', id.toString(), kr);
+    await refreshData();
+  };
+
+  const deleteCollectionOkrKeyResult = async (id: number) => {
+    const krCols = okrs.flatMap(o => o.KeyResults || []).flatMap((k: any) => k.Collections || []);
+    const col = krCols.find((c: any) => c.id === id);
+    const { error } = await supabase.from('collection_okr_key_results').delete().eq('id', id);
+    if (error) {
+      console.error('Failed to delete OKR Key Result collection:', error);
+      throw error;
+    }
+    await logAction('DELETE', 'CollectionOKRKeyResult', id.toString(), col);
+    await refreshData();
   };
 
   const refreshData = async () => {
@@ -662,6 +699,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       projects, globalNSMs, okrs, loading, refreshData,
       deleteProject, deleteCollectionROI, deleteCollectionNSM, deleteNSM,
+      deleteOKR, deleteOkrKeyResult, deleteCollectionOkrKeyResult,
       updateProject, addProject, updateCollectionROI, updateCollectionNSM, updateNSM,
       addCollectionROI, addNSM, addCollectionNSM,
       addOKR, addOkrKeyResult, updateOkrKeyResult, addCollectionOkrKeyResult,

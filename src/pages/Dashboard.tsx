@@ -20,7 +20,10 @@ export function Dashboard() {
     addOKR,
     addOkrKeyResult,
     updateOkrKeyResult,
-    addCollectionOkrKeyResult
+    addCollectionOkrKeyResult,
+    deleteOKR,
+    deleteOkrKeyResult,
+    deleteCollectionOkrKeyResult
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
@@ -579,41 +582,29 @@ export function Dashboard() {
               {allOkrs
                 .filter((o: any) => Number(o.baseYear) === peYear)
                 .map((okr: any) => (
-                  <div key={okr.id} className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                      <div className="min-w-0">
-                        <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Objetivo</div>
-                        <div className="text-[15px] font-bold text-[var(--text)] mt-1 break-words">{okr.objectiveName}</div>
-                        <div className="text-[12px] text-[var(--text-dim)] mt-1">Ano base: {okr.baseYear}</div>
-                      </div>
-                      <button
-                        className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans hover:opacity-80 transition-opacity shrink-0"
-                        onClick={async () => {
-                          const name = prompt('Nome do Resultado-Chave');
-                          if (!name) return;
-                          await addOkrKeyResult({ okrId: okr.id, name });
-                        }}
-                      >
-                        <span className="inline-flex items-center gap-2"><Plus size={14} />Adicionar KR</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
-                      {(okr.KeyResults || []).map((kr: any) => (
-                        <KeyResultCard
-                          key={kr.id}
-                          kr={kr}
-                          onEdit={() => setEditingKr(kr)}
-                          onCollect={() => setCollectingKr(kr)}
-                        />
-                      ))}
-                      {(okr.KeyResults || []).length === 0 && (
-                        <div className="glass-card rounded-lg p-8 text-center text-[13px] text-[var(--text-dim)]">
-                          Nenhum resultado-chave ainda.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <ObjectiveCard
+                    key={okr.id}
+                    okr={okr}
+                    onAddKr={async () => {
+                      const name = prompt('Nome do Resultado-Chave');
+                      if (!name) return;
+                      await addOkrKeyResult({ okrId: okr.id, name });
+                    }}
+                    onDeleteObjective={async () => {
+                      if (!confirm('Excluir este objetivo (OKR) e todos os seus KRs/coletas?')) return;
+                      await deleteOKR(okr.id);
+                    }}
+                    onEditKr={(kr: any) => setEditingKr(kr)}
+                    onCollectKr={(kr: any) => setCollectingKr(kr)}
+                    onDeleteKr={async (kr: any) => {
+                      if (!confirm('Excluir este Resultado-Chave (KR) e todas as coletas?')) return;
+                      await deleteOkrKeyResult(kr.id);
+                    }}
+                    onDeleteKrCollection={async (collectionId: number) => {
+                      if (!confirm('Excluir esta coleta?')) return;
+                      await deleteCollectionOkrKeyResult(collectionId);
+                    }}
+                  />
                 ))}
             </div>
           )}
@@ -902,7 +893,100 @@ function KeyResultCollectModal({ kr, onClose, onSave }: { kr: any; onClose: () =
   );
 }
 
-function KeyResultCard({ kr, onEdit, onCollect }: { kr: any; onEdit: () => void; onCollect: () => void; key?: any }) {
+function ObjectiveCard({
+  okr,
+  onAddKr,
+  onDeleteObjective,
+  onEditKr,
+  onCollectKr,
+  onDeleteKr,
+  onDeleteKrCollection
+}: {
+  okr: any;
+  onAddKr: () => Promise<void>;
+  onDeleteObjective: () => Promise<void>;
+  onEditKr: (kr: any) => void;
+  onCollectKr: (kr: any) => void;
+  onDeleteKr: (kr: any) => Promise<void>;
+  onDeleteKrCollection: (collectionId: number) => Promise<void>;
+  key?: any;
+}) {
+  const [collapsed, setCollapsed] = useState(true);
+  const krCount = (okr?.KeyResults || []).length;
+
+  return (
+    <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Objetivo</div>
+          <div className="text-[15px] font-bold text-[var(--text)] mt-1 break-words">{okr.objectiveName}</div>
+          <div className="text-[12px] text-[var(--text-dim)] mt-1">Ano base: {okr.baseYear} · {krCount} KR(s)</div>
+        </div>
+
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+          >
+            {collapsed ? 'Expandir' : 'Recolher'}
+          </button>
+          <button
+            onClick={onDeleteObjective}
+            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--red)] hover:opacity-80 transition-opacity"
+          >
+            Excluir
+          </button>
+        </div>
+      </div>
+
+      {!collapsed && (
+        <>
+          <div className="mt-4 flex justify-end">
+            <button
+              className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans hover:opacity-80 transition-opacity"
+              onClick={onAddKr}
+            >
+              <span className="inline-flex items-center gap-2"><Plus size={14} />Adicionar KR</span>
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
+            {(okr.KeyResults || []).map((kr: any) => (
+              <KeyResultCard
+                key={kr.id}
+                kr={kr}
+                onEdit={() => onEditKr(kr)}
+                onCollect={() => onCollectKr(kr)}
+                onDeleteKr={() => onDeleteKr(kr)}
+                onDeleteCollection={onDeleteKrCollection}
+              />
+            ))}
+            {(okr.KeyResults || []).length === 0 && (
+              <div className="glass-card rounded-lg p-8 text-center text-[13px] text-[var(--text-dim)]">
+                Nenhum resultado-chave ainda.
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function KeyResultCard({
+  kr,
+  onEdit,
+  onCollect,
+  onDeleteKr,
+  onDeleteCollection
+}: {
+  kr: any;
+  onEdit: () => void;
+  onCollect: () => void;
+  onDeleteKr?: () => void;
+  onDeleteCollection?: (collectionId: number) => void;
+  key?: any;
+}) {
   const [expanded, setExpanded] = useState(true);
   const cols = kr?.Collections || [];
   const sortedDesc = [...cols].sort((a: any, b: any) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
@@ -933,6 +1017,11 @@ function KeyResultCard({ kr, onEdit, onCollect }: { kr: any; onEdit: () => void;
           <button onClick={onCollect} className="px-2 py-1 bg-[var(--green)] text-white rounded-md text-[11px] font-bold hover:opacity-80">
             Coletar
           </button>
+          {onDeleteKr && (
+            <button onClick={onDeleteKr} className="px-2 py-1 bg-[var(--bg4)] border border-[var(--border2)] rounded-md text-[11px] font-medium text-[var(--red)] hover:opacity-80">
+              Excluir
+            </button>
+          )}
         </div>
       </div>
 
@@ -969,6 +1058,7 @@ function KeyResultCard({ kr, onEdit, onCollect }: { kr: any; onEdit: () => void;
                       <th className="py-1 font-medium text-right">Meta</th>
                       <th className="py-1 font-medium text-right">Obtido</th>
                       <th className="py-1 font-medium">Obs.</th>
+                      <th className="py-1 font-medium"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
@@ -982,6 +1072,18 @@ function KeyResultCard({ kr, onEdit, onCollect }: { kr: any; onEdit: () => void;
                         <td className="py-1 text-right font-mono text-[var(--text)]">{Number(c.targetAtDate).toLocaleString()}</td>
                         <td className="py-1 text-right font-mono text-[var(--text)]">{Number(c.valueObtained).toLocaleString()}</td>
                         <td className="py-1 text-[var(--text-mid)] truncate max-w-[160px]" title={c.observation || ''}>{c.observation || '—'}</td>
+                        <td className="py-1 text-right">
+                          {onDeleteCollection && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteCollection(c.id)}
+                              className="text-[var(--red)] hover:opacity-80 transition-opacity"
+                              title="Excluir coleta"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
