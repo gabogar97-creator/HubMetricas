@@ -669,6 +669,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addCollectionNSM = async (data: any) => {
     const nsm = projects.flatMap(p => p.NSMs || []).find(n => n.id === data.nsmId);
+    if (!nsm) {
+      throw new Error('NSM não encontrada. Atualize a página e tente novamente.');
+    }
+    if (nsm.projectId == null) {
+      throw new Error('NSM sem projeto vinculado. Não é possível salvar coleta.');
+    }
     const payload: any = {
       nsm_id: data.nsmId,
       project_id: nsm?.projectId,

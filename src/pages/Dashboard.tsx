@@ -31,11 +31,21 @@ export function Dashboard() {
   const [newNsmId, setNewNsmId] = useState('');
   const [newNsmDate, setNewNsmDate] = useState(new Date().toISOString().split('T')[0]);
   const [newNsmValue, setNewNsmValue] = useState('');
+  const [nsmSaveError, setNsmSaveError] = useState<string>('');
+  const [isSavingNsm, setIsSavingNsm] = useState(false);
   const [peYear, setPeYear] = useState<number>(new Date().getFullYear());
   const [isOkrModalOpen, setIsOkrModalOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<any | null>(null);
   const [collectingKr, setCollectingKr] = useState<any | null>(null);
   const navigate = useNavigate();
+
+  const parsePtBrNumber = (raw: string) => {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    const normalized = s.replace(/\./g, '').replace(/,/g, '.');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  };
 
   const getLatestAccumulatedValue = (rows: any[], type: string) => {
     const latest = (rows || [])
@@ -46,13 +56,36 @@ export function Dashboard() {
 
   const handleSaveNsmValue = async () => {
     if (!newNsmId || !newNsmDate || !newNsmValue) return;
-    await addCollectionNSM({
-      nsmId: Number(newNsmId),
-      date: newNsmDate,
-      value: newNsmValue
-    });
-    setIsNsmModalOpen(false);
-    setNewNsmId(''); setNewNsmValue('');
+    setNsmSaveError('');
+    setIsSavingNsm(true);
+
+    try {
+      const selected = allNsms.find((n: any) => Number(n.id) === Number(newNsmId));
+      const isNumeric = ['number', 'percentage', 'currency'].includes(selected?.type || 'number');
+
+      const valueToSave = isNumeric
+        ? (() => {
+            const n = parsePtBrNumber(newNsmValue);
+            if (n == null) throw new Error('Valor inválido. Use apenas números.');
+            return String(n);
+          })()
+        : newNsmValue;
+
+      await addCollectionNSM({
+        nsmId: Number(newNsmId),
+        date: newNsmDate,
+        value: valueToSave
+      });
+
+      setIsNsmModalOpen(false);
+      setNewNsmId('');
+      setNewNsmValue('');
+    } catch (e: any) {
+      console.error('Failed to save NSM value:', e);
+      setNsmSaveError(e?.message || 'Não foi possível salvar o valor da NSM.');
+    } finally {
+      setIsSavingNsm(false);
+    }
   };
 
   const allNsms = useMemo(() => {
@@ -615,11 +648,15 @@ export function Dashboard() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <h3 className="font-semibold text-[var(--text)]">Adicionar Valor NSM</h3>
+              <div>
+                <h3 className="font-semibold text-[var(--text)]">Adicionar Valor NSM</h3>
+                <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Selecione uma NSM e registre o valor.</div>
+              </div>
               <button onClick={() => setIsNsmModalOpen(false)} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
                 <X size={20} />
               </button>
             </div>
+
             <div className="p-5 space-y-4">
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">NSM</label>
@@ -638,9 +675,20 @@ export function Dashboard() {
                 <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Valor</label>
                 <input type="text" value={newNsmValue} onChange={(e) => setNewNsmValue(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
               </div>
+              {nsmSaveError && (
+                <div className="text-[12px] text-[var(--red)]">{nsmSaveError}</div>
+              )}
               <div className="pt-2 flex justify-end gap-2">
                 <button onClick={() => setIsNsmModalOpen(false)} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Cancelar</button>
-                <button onClick={handleSaveNsmValue} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors">Salvar</button>
+                <button
+                  disabled={isSavingNsm}
+                  className={`px-4 py-2 rounded-md text-xs font-semibold text-white transition-opacity ${
+                    isSavingNsm ? 'bg-[var(--accent)] opacity-60 cursor-not-allowed' : 'bg-[var(--accent)] hover:opacity-90'
+                  }`}
+                  onClick={handleSaveNsmValue}
+                >
+                  {isSavingNsm ? 'Salvando…' : 'Salvar'}
+                </button>
               </div>
             </div>
           </div>
