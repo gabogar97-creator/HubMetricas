@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 
 export function PrioritizationQueue() {
   const [queueListTab, setQueueListTab] = useState<'to_prioritize' | 'prioritized'>('to_prioritize');
+  const [isMethodologyCollapsed, setIsMethodologyCollapsed] = useState(true);
+  const [isMatrixCollapsed, setIsMatrixCollapsed] = useState(true);
   const [filterBu, setFilterBu] = useState('');
   const [filterSponsor, setFilterSponsor] = useState('');
   const [filterId, setFilterId] = useState('');
@@ -122,13 +124,48 @@ export function PrioritizationQueue() {
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-        <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Metodologia de Priorização</div>
-        <div className="text-[13px] text-[var(--text-mid)] leading-relaxed whitespace-pre-wrap">
-          {`A área de IA da Zucchetti Brasil adota uma metodologia de priorização baseada em ROI estimado de 12 meses como critério único e objetivo de entrada no roadmap de desenvolvimento. Toda iniciativa de IA passa por um fluxo estruturado que começa na área de negócio: o solicitante submete a iniciativa com escopo, NSM — a métrica de negócio que o projeto vai mover — e a estimativa de retorno com memória de cálculo, classificada obrigatoriamente como saving ou receita. O time de IA recebe essa submissão, classifica o tipo de iniciativa, analisa viabilidade, refina as métricas junto ao solicitante e estima o esforço de desenvolvimento. Com especificação e métricas definidas, o projeto aguarda priorização — e só entra nessa fila se NSM e ROI estiverem devidamente preenchidos. O Diretor de BU revisa e assina o ROI mensalmente, transformando a estimativa em compromisso de negócio. A partir daí, o Hub de Métricas plota automaticamente todos os projetos elegíveis em uma matriz de Valor versus Esforço, classificando-os em Quick Wins, Big Bets ou projetos de menor prioridade, e gera a lista ordenada que o PO utiliza para puxar as demandas ao desenvolvimento — sem negociação, sem política. O roadmap é composto por 40% de Quick Wins, 40% de Big Bets e 20% de buffer para urgências. Em caso de empate, o desempate segue três critérios em sequência: maior ROI absoluto, relevância da BU para o faturamento da Zucchetti Brasil, e menor esforço estimado. Ao entrar em desenvolvimento, o Country Manager é notificado com o detalhamento das métricas aprovadas e, em caso de discordância, aciona o Diretor da BU com intermediação do Head de IA. O acompanhamento do projeto e o monitoramento de NSM e ROI real versus projetado ficam disponíveis sob demanda no AI Lab e no Hub de Métricas — sem relatórios periódicos intermediados pelo time de IA.`}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Metodologia de Priorização</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Descrição do método adotado para entrada no roadmap.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsMethodologyCollapsed(!isMethodologyCollapsed)}
+            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors shrink-0"
+          >
+            {isMethodologyCollapsed ? 'Expandir' : 'Recolher'}
+          </button>
         </div>
+
+        {!isMethodologyCollapsed && (
+          <div className="mt-4 text-[13px] text-[var(--text-mid)] leading-relaxed whitespace-pre-wrap">
+            {`A área de IA da Zucchetti Brasil adota uma metodologia de priorização baseada em ROI estimado de 12 meses como critério único e objetivo de entrada no roadmap de desenvolvimento. Toda iniciativa de IA passa por um fluxo estruturado que começa na área de negócio: o solicitante submete a iniciativa com escopo, NSM — a métrica de negócio que o projeto vai mover — e a estimativa de retorno com memória de cálculo, classificada obrigatoriamente como saving ou receita. O time de IA recebe essa submissão, classifica o tipo de iniciativa, analisa viabilidade, refina as métricas junto ao solicitante e estima o esforço de desenvolvimento. Com especificação e métricas definidas, o projeto aguarda priorização — e só entra nessa fila se NSM e ROI estiverem devidamente preenchidos. O Diretor de BU revisa e assina o ROI mensalmente, transformando a estimativa em compromisso de negócio. A partir daí, o Hub de Métricas plota automaticamente todos os projetos elegíveis em uma matriz de Valor versus Esforço, classificando-os em Quick Wins, Big Bets ou projetos de menor prioridade, e gera a lista ordenada que o PO utiliza para puxar as demandas ao desenvolvimento — sem negociação, sem política. O roadmap é composto por 40% de Quick Wins, 40% de Big Bets e 20% de buffer para urgências. Em caso de empate, o desempate segue três critérios em sequência: maior ROI absoluto, relevância da BU para o faturamento da Zucchetti Brasil, e menor esforço estimado. Ao entrar em desenvolvimento, o Country Manager é notificado com o detalhamento das métricas aprovadas e, em caso de discordância, aciona o Diretor da BU com intermediação do Head de IA. O acompanhamento do projeto e o monitoramento de NSM e ROI real versus projetado ficam disponíveis sob demanda no AI Lab e no Hub de Métricas — sem relatórios periódicos intermediados pelo time de IA.`}
+          </div>
+        )}
       </div>
 
-      <QuadrantMatrix projects={filteredAllProjects} fmtCurrency={fmtCurrency} onProjectClick={openProjectModal} />
+      <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Matriz Valor vs Esforço</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Quick Wins, Big Bets, Preenche fila e Não entram.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsMatrixCollapsed(!isMatrixCollapsed)}
+            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors shrink-0"
+          >
+            {isMatrixCollapsed ? 'Expandir' : 'Recolher'}
+          </button>
+        </div>
+
+        {!isMatrixCollapsed && (
+          <div className="mt-4">
+            <QuadrantMatrix projects={filteredAllProjects} fmtCurrency={fmtCurrency} onProjectClick={openProjectModal} />
+          </div>
+        )}
+      </div>
 
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
         <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap mb-4">
