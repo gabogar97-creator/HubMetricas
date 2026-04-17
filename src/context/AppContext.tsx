@@ -64,7 +64,6 @@ export interface OkrKeyResult {
 
 export interface OKR {
   id: number;
-  projectId: number;
   baseYear: number;
   objectiveName: string;
   KeyResults: OkrKeyResult[];
@@ -83,12 +82,12 @@ export interface Project {
   roiMethods?: RoiMethod[];
   CollectionROIs: CollectionROI[];
   NSMs: NSM[];
-  OKRs?: OKR[];
 }
 
 interface AppContextType {
   projects: Project[];
   globalNSMs: NSM[];
+  okrs: OKR[];
   loading: boolean;
   refreshData: () => Promise<void>;
   deleteProject: (id: number) => Promise<void>;
@@ -123,6 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   console.log('Rendering AppProvider...');
   const [projects, setProjects] = useState<Project[]>([]);
   const [globalNSMs, setGlobalNSMs] = useState<NSM[]>([]);
+  const [okrs, setOkrs] = useState<OKR[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasNewLogs, setHasNewLogs] = useState(false);
   const { user } = useAuth();
@@ -259,96 +259,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const projDataWithOkrs = [...projData];
       try {
-        const projectIdsForOkrs = projDataWithOkrs.map(p => p.id).filter((id: any) => id != null);
-        if (projectIdsForOkrs.length > 0) {
-          const okrRes = await supabase
-            .from('okrs')
-            .select('*')
-            .in('project_id', projectIdsForOkrs);
+        const okrRes = await supabase
+          .from('okrs')
+          .select('*');
 
-          if (okrRes.error) throw okrRes.error;
+        if (okrRes.error) throw okrRes.error;
 
-          const okrs = (okrRes.data || []) as any[];
-          const okrIds = okrs.map(o => o.id).filter((id: any) => id != null);
+        const rawOkrs = (okrRes.data || []) as any[];
+        const okrIds = rawOkrs.map(o => o.id).filter((id: any) => id != null);
 
-          const krRes = okrIds.length
-            ? await supabase
-                .from('okr_key_results')
-                .select('*')
-                .in('okr_id', okrIds)
-            : { data: [], error: null as any };
+        const krRes = okrIds.length
+          ? await supabase
+              .from('okr_key_results')
+              .select('*')
+              .in('okr_id', okrIds)
+          : { data: [], error: null as any };
 
-          if ((krRes as any).error) throw (krRes as any).error;
+        if ((krRes as any).error) throw (krRes as any).error;
 
-          const krs = ((krRes as any).data || []) as any[];
-          const krIds = krs.map(k => k.id).filter((id: any) => id != null);
+        const krs = ((krRes as any).data || []) as any[];
+        const krIds = krs.map(k => k.id).filter((id: any) => id != null);
 
-          const colKrRes = krIds.length
-            ? await supabase
-                .from('collection_okr_key_results')
-                .select('*')
-                .in('okr_key_result_id', krIds)
-            : { data: [], error: null as any };
+        const colKrRes = krIds.length
+          ? await supabase
+              .from('collection_okr_key_results')
+              .select('*')
+              .in('okr_key_result_id', krIds)
+          : { data: [], error: null as any };
 
-          if ((colKrRes as any).error) throw (colKrRes as any).error;
+        if ((colKrRes as any).error) throw (colKrRes as any).error;
 
-          const krCols = ((colKrRes as any).data || []) as any[];
+        const krCols = ((colKrRes as any).data || []) as any[];
 
-          const colsByKrId = new Map<number, any[]>();
-          krCols.forEach((c: any) => {
-            if (c?.okr_key_result_id == null) return;
-            const id = Number(c.okr_key_result_id);
-            colsByKrId.set(id, [...(colsByKrId.get(id) || []), c]);
-          });
+        const colsByKrId = new Map<number, any[]>();
+        krCols.forEach((c: any) => {
+          if (c?.okr_key_result_id == null) return;
+          const id = Number(c.okr_key_result_id);
+          colsByKrId.set(id, [...(colsByKrId.get(id) || []), c]);
+        });
 
-          const krsByOkrId = new Map<number, any[]>();
-          krs.forEach((k: any) => {
-            if (k?.okr_id == null) return;
-            const id = Number(k.okr_id);
-            const mappedKr: OkrKeyResult = {
-              id: k.id,
-              okrId: Number(k.okr_id),
-              name: k.name,
-              calcMemory: k.calc_memory,
-              source: k.source,
-              globalTarget: k.global_target,
-              Collections: (colsByKrId.get(k.id) || []).map((c: any) => ({
-                id: c.id,
-                okrKeyResultId: Number(c.okr_key_result_id),
-                date: c.date,
-                targetAtDate: Number(c.target_at_date) || 0,
-                valueObtained: Number(c.value_obtained) || 0,
-                observation: c.observation
-              }))
-            };
+        const krsByOkrId = new Map<number, any[]>();
+        krs.forEach((k: any) => {
+          if (k?.okr_id == null) return;
+          const id = Number(k.okr_id);
+          const mappedKr: OkrKeyResult = {
+            id: k.id,
+            okrId: Number(k.okr_id),
+            name: k.name,
+            calcMemory: k.calc_memory,
+            source: k.source,
+            globalTarget: k.global_target,
+            Collections: (colsByKrId.get(k.id) || []).map((c: any) => ({
+              id: c.id,
+              okrKeyResultId: Number(c.okr_key_result_id),
+              date: c.date,
+              targetAtDate: Number(c.target_at_date) || 0,
+              valueObtained: Number(c.value_obtained) || 0,
+              observation: c.observation
+            }))
+          };
 
-            krsByOkrId.set(id, [...(krsByOkrId.get(id) || []), mappedKr]);
-          });
+          krsByOkrId.set(id, [...(krsByOkrId.get(id) || []), mappedKr]);
+        });
 
-          const okrsByProjectId = new Map<number, OKR[]>();
-          okrs.forEach((o: any) => {
-            if (o?.project_id == null) return;
-            const pid = Number(o.project_id);
-            const oid = Number(o.id);
-            const mappedOkr: OKR = {
-              id: oid,
-              projectId: pid,
-              baseYear: Number(o.base_year) || new Date().getFullYear(),
-              objectiveName: o.objective_name,
-              KeyResults: (krsByOkrId.get(oid) || []) as OkrKeyResult[]
-            };
-            okrsByProjectId.set(pid, [...(okrsByProjectId.get(pid) || []), mappedOkr]);
-          });
+        const mappedOkrs: OKR[] = rawOkrs.map((o: any) => {
+          const oid = Number(o.id);
+          return {
+            id: oid,
+            baseYear: Number(o.base_year) || new Date().getFullYear(),
+            objectiveName: o.objective_name,
+            KeyResults: (krsByOkrId.get(oid) || []) as OkrKeyResult[]
+          };
+        });
 
-          for (const p of projDataWithOkrs) {
-            p.OKRs = okrsByProjectId.get(p.id) || [];
-          }
-        }
+        setOkrs(mappedOkrs);
       } catch (e: any) {
         console.warn('Skipping OKR fetch (tables may not exist yet):', e?.message || e);
-        for (const p of projDataWithOkrs) {
-          p.OKRs = [];
-        }
+        setOkrs([]);
       }
       console.log('Fetched projects:', projData.length);
       setProjects(projDataWithOkrs);
@@ -373,7 +360,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addOKR = async (data: any) => {
     const payload: any = {
-      project_id: data.projectId,
       base_year: data.baseYear,
       objective_name: data.objectiveName
     };
@@ -674,7 +660,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      projects, globalNSMs, loading, refreshData,
+      projects, globalNSMs, okrs, loading, refreshData,
       deleteProject, deleteCollectionROI, deleteCollectionNSM, deleteNSM,
       updateProject, addProject, updateCollectionROI, updateCollectionNSM, updateNSM,
       addCollectionROI, addNSM, addCollectionNSM,

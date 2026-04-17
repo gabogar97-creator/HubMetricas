@@ -134,19 +134,8 @@ export function Dashboard() {
     return list;
   }, [projects]);
 
-  const allOkrs = useMemo(() => {
-    const list: any[] = [];
-    projects.forEach((p: any) => {
-      (p.OKRs || []).forEach((o: any) => {
-        list.push({
-          ...o,
-          projectId: p.id,
-          projectName: p.name
-        });
-      });
-    });
-    return list;
-  }, [projects]);
+  const { okrs } = useAppContext();
+  const allOkrs = useMemo(() => okrs || [], [okrs]);
 
   const availablePeYears = useMemo(() => {
     const years = new Set<number>();
@@ -711,12 +700,12 @@ export function Dashboard() {
               {allOkrs
                 .filter((o: any) => Number(o.baseYear) === peYear)
                 .map((okr: any) => (
-                  <div key={`${okr.projectId}-${okr.id}`} className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+                  <div key={okr.id} className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="min-w-0">
                         <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Objetivo</div>
                         <div className="text-[15px] font-bold text-[var(--text)] mt-1 break-words">{okr.objectiveName}</div>
-                        <div className="text-[12px] text-[var(--text-dim)] mt-1">Projeto: {okr.projectName} · Ano base: {okr.baseYear}</div>
+                        <div className="text-[12px] text-[var(--text-dim)] mt-1">Ano base: {okr.baseYear}</div>
                       </div>
                       <button
                         className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans hover:opacity-80 transition-opacity shrink-0"
@@ -790,7 +779,6 @@ export function Dashboard() {
 
       {isOkrModalOpen && (
         <OkrCreateModal
-          projects={projects}
           defaultYear={peYear}
           onClose={() => setIsOkrModalOpen(false)}
           onSave={async (payload) => {
@@ -829,13 +817,12 @@ export function Dashboard() {
   );
 }
 
-function OkrCreateModal({ projects, defaultYear, onClose, onSave }: { projects: any[]; defaultYear: number; onClose: () => void; onSave: (payload: any) => Promise<void> }) {
-  const [projectId, setProjectId] = useState<string>(projects[0]?.id?.toString?.() || '');
+function OkrCreateModal({ defaultYear, onClose, onSave }: { defaultYear: number; onClose: () => void; onSave: (payload: any) => Promise<void> }) {
   const [objectiveName, setObjectiveName] = useState('');
   const [baseYear, setBaseYear] = useState<number>(defaultYear);
   const [keyResults, setKeyResults] = useState<string[]>(['']);
 
-  const canSave = projectId && objectiveName.trim().length > 0 && keyResults.some(k => k.trim().length > 0);
+  const canSave = objectiveName.trim().length > 0 && keyResults.some(k => k.trim().length > 0);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -851,29 +838,14 @@ function OkrCreateModal({ projects, defaultYear, onClose, onSave }: { projects: 
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Projeto</label>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-              >
-                <option value="">Selecione um projeto...</option>
-                {projects.map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Ano base</label>
-              <input
-                type="number"
-                value={baseYear}
-                onChange={(e) => setBaseYear(Number(e.target.value))}
-                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Ano base</label>
+            <input
+              type="number"
+              value={baseYear}
+              onChange={(e) => setBaseYear(Number(e.target.value))}
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -922,7 +894,7 @@ function OkrCreateModal({ projects, defaultYear, onClose, onSave }: { projects: 
             <button onClick={onClose} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Cancelar</button>
             <button
               disabled={!canSave}
-              onClick={() => onSave({ projectId: Number(projectId), baseYear, objectiveName, keyResults: keyResults.map(k => k.trim()).filter(Boolean) })}
+              onClick={() => onSave({ baseYear, objectiveName, keyResults: keyResults.map(k => k.trim()).filter(Boolean) })}
               className={`px-4 py-2 rounded-md text-xs font-semibold transition-colors ${canSave ? 'bg-[var(--accent)] text-white hover:bg-[#33ddff]' : 'bg-[var(--bg4)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
             >
               Salvar
