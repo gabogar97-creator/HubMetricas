@@ -2,6 +2,12 @@ import React, { useMemo, useState } from 'react';
 
 export function PrioritizationQueue() {
   const [queueListTab, setQueueListTab] = useState<'to_prioritize' | 'prioritized'>('to_prioritize');
+  const [filterBu, setFilterBu] = useState('');
+  const [filterSponsor, setFilterSponsor] = useState('');
+  const [filterId, setFilterId] = useState('');
+  const [filterTitle, setFilterTitle] = useState('');
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [scopeDraft, setScopeDraft] = useState<string>('');
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -76,6 +82,39 @@ export function PrioritizationQueue() {
     return list;
   }, []);
 
+  const availableBus = useMemo(() => {
+    const set = new Set<string>();
+    mockQueueProjects.forEach((p: any) => p?.bu && set.add(p.bu));
+    return Array.from(set).sort();
+  }, [mockQueueProjects]);
+
+  const availableSponsors = useMemo(() => {
+    const set = new Set<string>();
+    mockQueueProjects.forEach((p: any) => p?.sponsor && set.add(p.sponsor));
+    return Array.from(set).sort();
+  }, [mockQueueProjects]);
+
+  const matchesFilters = (p: any) => {
+    const buOk = !filterBu || String(p?.bu || '').toLowerCase() === filterBu.toLowerCase();
+    const sponsorOk = !filterSponsor || String(p?.sponsor || '').toLowerCase() === filterSponsor.toLowerCase();
+    const idOk = !filterId || String(p?.jiraKey || p?.id || '').toLowerCase().includes(filterId.toLowerCase());
+    const titleOk = !filterTitle || String(p?.title || '').toLowerCase().includes(filterTitle.toLowerCase());
+    return buOk && sponsorOk && idOk && titleOk;
+  };
+
+  const filteredProjects = useMemo(() => {
+    return mockQueueProjects.filter((p: any) => p.status === queueListTab).filter(matchesFilters);
+  }, [mockQueueProjects, queueListTab, filterBu, filterSponsor, filterId, filterTitle]);
+
+  const filteredAllProjects = useMemo(() => {
+    return mockQueueProjects.filter(matchesFilters);
+  }, [mockQueueProjects, filterBu, filterSponsor, filterId, filterTitle]);
+
+  const openProjectModal = (p: any) => {
+    setSelectedProject(p);
+    setScopeDraft(p?.scope || '');
+  };
+
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
@@ -85,7 +124,7 @@ export function PrioritizationQueue() {
         </div>
       </div>
 
-      <QuadrantMatrix projects={mockQueueProjects} fmtCurrency={fmtCurrency} />
+      <QuadrantMatrix projects={filteredAllProjects} fmtCurrency={fmtCurrency} onProjectClick={openProjectModal} />
 
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
         <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap mb-4">
@@ -107,16 +146,74 @@ export function PrioritizationQueue() {
           </button>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-4">
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU</div>
+            <select
+              value={filterBu}
+              onChange={(e) => setFilterBu(e.target.value)}
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            >
+              <option value="">Todas</option>
+              {availableBus.map((bu) => (
+                <option key={bu} value={bu}>{bu}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Sponsor</div>
+            <select
+              value={filterSponsor}
+              onChange={(e) => setFilterSponsor(e.target.value)}
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            >
+              <option value="">Todos</option>
+              {availableSponsors.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ID</div>
+            <input
+              value={filterId}
+              onChange={(e) => setFilterId(e.target.value)}
+              placeholder="Ex: IA-1001"
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Título</div>
+            <input
+              value={filterTitle}
+              onChange={(e) => setFilterTitle(e.target.value)}
+              placeholder="Buscar por título"
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            />
+          </div>
+        </div>
+
         <QueueProjectsTable
-          projects={mockQueueProjects.filter(p => p.status === queueListTab)}
+          projects={filteredProjects}
           fmtCurrency={fmtCurrency}
+          onProjectClick={openProjectModal}
         />
       </div>
+
+      {selectedProject && (
+        <ProjectDetailsModal
+          project={selectedProject}
+          scope={scopeDraft}
+          onChangeScope={setScopeDraft}
+          fmtCurrency={fmtCurrency}
+          onClose={() => setSelectedProject(null)}
+        />
+      )}
     </div>
   );
 }
 
-function QuadrantMatrix({ projects, fmtCurrency }: { projects: any[]; fmtCurrency: (n: number | null) => string }) {
+function QuadrantMatrix({ projects, fmtCurrency, onProjectClick }: { projects: any[]; fmtCurrency: (n: number | null) => string; onProjectClick: (p: any) => void }) {
   const quadrantProjects = {
     quickWins: projects.filter(p => p.roi === 'high' && p.effort === 'low'),
     bigBets: projects.filter(p => p.roi === 'high' && p.effort === 'high'),
@@ -125,13 +222,18 @@ function QuadrantMatrix({ projects, fmtCurrency }: { projects: any[]; fmtCurrenc
   };
 
   const ProjectLine = ({ p }: { p: any; key?: any }) => (
-    <div className="text-[12px] text-[var(--text-mid)] truncate" title={`${p.jiraKey}: ${p.title} | ${fmtCurrency(p.estimatedRoi12m)}`}>
+    <button
+      type="button"
+      onClick={() => onProjectClick(p)}
+      className="w-full text-left text-[12px] text-[var(--text-mid)] truncate hover:opacity-80 transition-opacity"
+      title={`${p.jiraKey}: ${p.title} | ${fmtCurrency(p.estimatedRoi12m)}`}
+    >
       <span className="font-mono text-[11px] text-[var(--text)]">{p.jiraKey}</span>
       <span className="text-[var(--text-dim)]">: </span>
       <span className="text-[var(--text)]">{p.title}</span>
       <span className="text-[var(--text-dim)]"> | </span>
       <span className="font-mono text-[11px] text-[var(--green)]">{fmtCurrency(p.estimatedRoi12m)}</span>
-    </div>
+    </button>
   );
 
   const Quadrant = ({ title, desc, items, accent }: { title: string; desc: string; items: any[]; accent: string }) => (
@@ -193,7 +295,15 @@ function QuadrantMatrix({ projects, fmtCurrency }: { projects: any[]; fmtCurrenc
   );
 }
 
-function QueueProjectsTable({ projects, fmtCurrency }: { projects: any[]; fmtCurrency: (n: number | null) => string }) {
+function QueueProjectsTable({
+  projects,
+  fmtCurrency,
+  onProjectClick
+}: {
+  projects: any[];
+  fmtCurrency: (n: number | null) => string;
+  onProjectClick: (p: any) => void;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-xs">
@@ -219,7 +329,11 @@ function QueueProjectsTable({ projects, fmtCurrency }: { projects: any[]; fmtCur
         </thead>
         <tbody className="divide-y divide-[var(--border)]">
           {projects.map((p: any) => (
-            <tr key={p.id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
+            <tr
+              key={p.id}
+              className="hover:bg-[rgba(255,255,255,0.02)] transition-colors cursor-pointer"
+              onClick={() => onProjectClick(p)}
+            >
               <td className="p-[10px_12px] font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.title}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.bu}</td>
@@ -238,6 +352,74 @@ function QueueProjectsTable({ projects, fmtCurrency }: { projects: any[]; fmtCur
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ProjectDetailsModal({
+  project,
+  scope,
+  onChangeScope,
+  fmtCurrency,
+  onClose
+}: {
+  project: any;
+  scope: string;
+  onChangeScope: (v: string) => void;
+  fmtCurrency: (n: number | null) => string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <div>
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Detalhes do Projeto</div>
+            <div className="text-[14px] font-bold text-[var(--text)] mt-1">{project.jiraKey}: {project.title}</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">✕</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU Origem</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{project.bu}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Sponsor</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{project.sponsor}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Estimado</div>
+              <div className="text-[13px] text-[var(--red)] font-semibold mt-1">{fmtCurrency(project.estimatedCost)}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado (12m)</div>
+              <div className="text-[13px] text-[var(--green)] font-semibold mt-1">{fmtCurrency(project.estimatedRoi12m)}</div>
+            </div>
+          </div>
+
+          <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Memória do Cálculo</div>
+            <div className="text-[13px] text-[var(--text-mid)] mt-1 whitespace-pre-wrap">{project.calcMemory}</div>
+          </div>
+
+          <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Escopo (mock — futuramente Jira)</div>
+            <textarea
+              value={scope}
+              onChange={(e) => onChangeScope(e.target.value)}
+              className="w-full mt-2 min-h-[120px] bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              placeholder="Descreva o escopo (campo retornará do Jira no futuro)"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button onClick={onClose} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Fechar</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
