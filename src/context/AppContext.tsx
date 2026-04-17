@@ -43,6 +43,33 @@ export interface CollectionROI {
   totalValue: number;
 }
 
+export interface CollectionOkrKeyResult {
+  id: number;
+  okrKeyResultId: number;
+  date: string;
+  targetAtDate: number;
+  valueObtained: number;
+  observation?: string;
+}
+
+export interface OkrKeyResult {
+  id: number;
+  okrId: number;
+  name: string;
+  calcMemory?: string;
+  source?: string;
+  globalTarget?: number;
+  Collections: CollectionOkrKeyResult[];
+}
+
+export interface OKR {
+  id: number;
+  projectId: number;
+  baseYear: number;
+  objectiveName: string;
+  KeyResults: OkrKeyResult[];
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -56,6 +83,7 @@ export interface Project {
   roiMethods?: RoiMethod[];
   CollectionROIs: CollectionROI[];
   NSMs: NSM[];
+  OKRs?: OKR[];
 }
 
 interface AppContextType {
@@ -75,6 +103,10 @@ interface AppContextType {
   addCollectionROI: (data: any) => Promise<void>;
   addNSM: (data: any) => Promise<void>;
   addCollectionNSM: (data: any) => Promise<void>;
+  addOKR: (data: any) => Promise<any>;
+  addOkrKeyResult: (data: any) => Promise<any>;
+  updateOkrKeyResult: (id: number, data: any) => Promise<void>;
+  addCollectionOkrKeyResult: (data: any) => Promise<any>;
   hasNewLogs: boolean;
   clearNewLogs: () => void;
   logAction: (action: string, entity: string, entityId?: string, oldValue?: any, newValue?: any) => Promise<void>;
@@ -224,8 +256,102 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         return mapped;
       });
+
+      const projDataWithOkrs = [...projData];
+      try {
+        const projectIdsForOkrs = projDataWithOkrs.map(p => p.id).filter((id: any) => id != null);
+        if (projectIdsForOkrs.length > 0) {
+          const okrRes = await supabase
+            .from('okrs')
+            .select('*')
+            .in('project_id', projectIdsForOkrs);
+
+          if (okrRes.error) throw okrRes.error;
+
+          const okrs = (okrRes.data || []) as any[];
+          const okrIds = okrs.map(o => o.id).filter((id: any) => id != null);
+
+          const krRes = okrIds.length
+            ? await supabase
+                .from('okr_key_results')
+                .select('*')
+                .in('okr_id', okrIds)
+            : { data: [], error: null as any };
+
+          if ((krRes as any).error) throw (krRes as any).error;
+
+          const krs = ((krRes as any).data || []) as any[];
+          const krIds = krs.map(k => k.id).filter((id: any) => id != null);
+
+          const colKrRes = krIds.length
+            ? await supabase
+                .from('collection_okr_key_results')
+                .select('*')
+                .in('okr_key_result_id', krIds)
+            : { data: [], error: null as any };
+
+          if ((colKrRes as any).error) throw (colKrRes as any).error;
+
+          const krCols = ((colKrRes as any).data || []) as any[];
+
+          const colsByKrId = new Map<number, any[]>();
+          krCols.forEach((c: any) => {
+            if (c?.okr_key_result_id == null) return;
+            const id = Number(c.okr_key_result_id);
+            colsByKrId.set(id, [...(colsByKrId.get(id) || []), c]);
+          });
+
+          const krsByOkrId = new Map<number, any[]>();
+          krs.forEach((k: any) => {
+            if (k?.okr_id == null) return;
+            const id = Number(k.okr_id);
+            const mappedKr: OkrKeyResult = {
+              id: k.id,
+              okrId: Number(k.okr_id),
+              name: k.name,
+              calcMemory: k.calc_memory,
+              source: k.source,
+              globalTarget: k.global_target,
+              Collections: (colsByKrId.get(k.id) || []).map((c: any) => ({
+                id: c.id,
+                okrKeyResultId: Number(c.okr_key_result_id),
+                date: c.date,
+                targetAtDate: Number(c.target_at_date) || 0,
+                valueObtained: Number(c.value_obtained) || 0,
+                observation: c.observation
+              }))
+            };
+
+            krsByOkrId.set(id, [...(krsByOkrId.get(id) || []), mappedKr]);
+          });
+
+          const okrsByProjectId = new Map<number, OKR[]>();
+          okrs.forEach((o: any) => {
+            if (o?.project_id == null) return;
+            const pid = Number(o.project_id);
+            const oid = Number(o.id);
+            const mappedOkr: OKR = {
+              id: oid,
+              projectId: pid,
+              baseYear: Number(o.base_year) || new Date().getFullYear(),
+              objectiveName: o.objective_name,
+              KeyResults: (krsByOkrId.get(oid) || []) as OkrKeyResult[]
+            };
+            okrsByProjectId.set(pid, [...(okrsByProjectId.get(pid) || []), mappedOkr]);
+          });
+
+          for (const p of projDataWithOkrs) {
+            p.OKRs = okrsByProjectId.get(p.id) || [];
+          }
+        }
+      } catch (e: any) {
+        console.warn('Skipping OKR fetch (tables may not exist yet):', e?.message || e);
+        for (const p of projDataWithOkrs) {
+          p.OKRs = [];
+        }
+      }
       console.log('Fetched projects:', projData.length);
-      setProjects(projData);
+      setProjects(projDataWithOkrs);
       setGlobalNSMs([]);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -243,6 +369,93 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await logAction('DELETE', 'Project', id.toString(), project);
     await refreshData();
+  };
+
+  const addOKR = async (data: any) => {
+    const payload: any = {
+      project_id: data.projectId,
+      base_year: data.baseYear,
+      objective_name: data.objectiveName
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { data: okr, error } = await supabase
+      .from('okrs')
+      .insert([payload])
+      .select()
+      .single();
+    if (error) {
+      console.error('Failed to create OKR:', error);
+      throw error;
+    }
+    await logAction('CREATE', 'OKR', okr?.id?.toString(), null, data);
+    await refreshData();
+    return okr;
+  };
+
+  const addOkrKeyResult = async (data: any) => {
+    const payload: any = {
+      okr_id: data.okrId,
+      name: data.name,
+      calc_memory: data.calcMemory,
+      source: data.source,
+      global_target: data.globalTarget
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { data: kr, error } = await supabase
+      .from('okr_key_results')
+      .insert([payload])
+      .select()
+      .single();
+    if (error) {
+      console.error('Failed to create OKR Key Result:', error);
+      throw error;
+    }
+    await logAction('CREATE', 'OKRKeyResult', kr?.id?.toString(), null, data);
+    await refreshData();
+    return kr;
+  };
+
+  const updateOkrKeyResult = async (id: number, data: any) => {
+    const payload: any = {
+      name: data.name,
+      calc_memory: data.calcMemory,
+      source: data.source,
+      global_target: data.globalTarget
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { error } = await supabase
+      .from('okr_key_results')
+      .update(payload)
+      .eq('id', id);
+    if (error) {
+      console.error('Failed to update OKR Key Result:', error);
+      throw error;
+    }
+    await logAction('UPDATE', 'OKRKeyResult', id.toString(), null, data);
+    await refreshData();
+  };
+
+  const addCollectionOkrKeyResult = async (data: any) => {
+    const payload: any = {
+      okr_key_result_id: data.okrKeyResultId,
+      date: data.date,
+      target_at_date: data.targetAtDate,
+      value_obtained: data.valueObtained,
+      observation: data.observation
+    };
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    const { data: col, error } = await supabase
+      .from('collection_okr_key_results')
+      .insert([payload])
+      .select()
+      .single();
+    if (error) {
+      console.error('Failed to create OKR Key Result collection:', error);
+      throw error;
+    }
+    await logAction('CREATE', 'CollectionOKRKeyResult', col?.id?.toString(), null, data);
+    await refreshData();
+    return col;
   };
 
   const deleteCollectionROI = async (id: number) => {
@@ -465,6 +678,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteProject, deleteCollectionROI, deleteCollectionNSM, deleteNSM,
       updateProject, addProject, updateCollectionROI, updateCollectionNSM, updateNSM,
       addCollectionROI, addNSM, addCollectionNSM,
+      addOKR, addOkrKeyResult, updateOkrKeyResult, addCollectionOkrKeyResult,
       hasNewLogs, clearNewLogs, logAction
     }}>
       {children}

@@ -22,10 +22,25 @@ export function Projects() {
   console.log('Starting Projects component render...');
   console.log('Projects component rendering...');
   console.log('Rendering Projects...');
-  const { projects, deleteCollectionROI, refreshData, addCollectionNSM, addCollectionROI } = useAppContext();
+  const {
+    projects,
+    deleteCollectionROI,
+    refreshData,
+    addCollectionNSM,
+    addCollectionROI,
+    addOKR,
+    addOkrKeyResult,
+    updateOkrKeyResult,
+    addCollectionOkrKeyResult
+  } = useAppContext();
   const [selId, setSelId] = useState<number | null>(null);
   const [wizard, setWizard] = useState(false);
   const [nsmWizard, setNsmWizard] = useState(false);
+  const [productTab, setProductTab] = useState<'nsm' | 'pe'>('nsm');
+  const [peYear, setPeYear] = useState<number>(new Date().getFullYear());
+  const [isOkrModalOpen, setIsOkrModalOpen] = useState(false);
+  const [editingKr, setEditingKr] = useState<any | null>(null);
+  const [collectingKr, setCollectingKr] = useState<any | null>(null);
   const location = useLocation();
 
   const getLatestAccumulatedValue = (rows: any[], type: string) => {
@@ -53,6 +68,22 @@ export function Projects() {
   }, [projects, selId, location.search]);
 
   const project = projects.find(p => p.id === selId);
+
+  const availablePeYears = useMemo(() => {
+    const years = new Set<number>();
+    (project?.OKRs || []).forEach((o: any) => {
+      const y = Number(o.baseYear);
+      if (!Number.isNaN(y) && y > 0) years.add(y);
+    });
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [project?.OKRs]);
+
+  useEffect(() => {
+    if (!availablePeYears.includes(peYear) && availablePeYears.length > 0) {
+      setPeYear(availablePeYears[0]);
+    }
+  }, [availablePeYears, peYear]);
 
   const {
     totalInvestment,
@@ -235,129 +266,220 @@ export function Projects() {
             <BreakdownCard label="Total de Custo" value={totalInvestment} color="var(--red)" />
           </div>
 
-          {/* Charts */}
-          {pc.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
-              <div className="glass-card rounded-xl p-[18px_20px]">
-                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3.5">Evolução por Tipo de Retorno</div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                    <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
-                    <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>fmtShort(v).replace("R$ ","")}/>
-                    <Tooltip formatter={(v: number)=>fmt(v)} contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
-                    <Legend wrapperStyle={{fontSize:11}}/>
-                    <Line type="monotone" dataKey="Saving" stroke="var(--saving)" strokeWidth={2} dot={{fill:"var(--saving)",r:3}}/>
-                    <Line type="monotone" dataKey="Custo Evitado" stroke="var(--custo-evitado)" strokeWidth={2} dot={{fill:"var(--custo-evitado)",r:3}}/>
-                    <Line type="monotone" dataKey="Receita" stroke="var(--receita)" strokeWidth={2} dot={{fill:"var(--receita)",r:3}}/>
-                    <Line type="monotone" dataKey="Investimento" stroke="var(--red)" strokeWidth={2} strokeDasharray="5 3" dot={{fill:"var(--red)",r:3}}/>
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="glass-card rounded-xl p-[18px_20px]">
-                <div className="flex justify-between items-center mb-3.5">
-                  <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Evolução da NSM</div>
-                  {nsmSeriesLabel && (
-                    <div className="text-[11px] text-[var(--text-dim)] truncate max-w-[220px]">{nsmSeriesLabel}</div>
-                  )}
+          <div className="glass-card rounded-xl p-[10px]">
+            <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap">
+              <TabInline id="nsm" label="Visão de Produto (NSM)" active={productTab} onClick={setProductTab} />
+              <TabInline id="pe" label="Indicadores do Planejamento (PE)" active={productTab} onClick={setProductTab} />
+            </div>
+          </div>
+
+          {productTab === 'nsm' && (
+            <>
+              {pc.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
+                  <div className="glass-card rounded-xl p-[18px_20px]">
+                    <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3.5">Evolução por Tipo de Retorno</div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                        <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                        <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>fmtShort(v).replace("R$ ","")}/>
+                        <Tooltip formatter={(v: number)=>fmt(v)} contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
+                        <Legend wrapperStyle={{fontSize:11}}/>
+                        <Line type="monotone" dataKey="Saving" stroke="var(--saving)" strokeWidth={2} dot={{fill:"var(--saving)",r:3}}/>
+                        <Line type="monotone" dataKey="Custo Evitado" stroke="var(--custo-evitado)" strokeWidth={2} dot={{fill:"var(--custo-evitado)",r:3}}/>
+                        <Line type="monotone" dataKey="Receita" stroke="var(--receita)" strokeWidth={2} dot={{fill:"var(--receita)",r:3}}/>
+                        <Line type="monotone" dataKey="Investimento" stroke="var(--red)" strokeWidth={2} strokeDasharray="5 3" dot={{fill:"var(--red)",r:3}}/>
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="glass-card rounded-xl p-[18px_20px]">
+                    <div className="flex justify-between items-center mb-3.5">
+                      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Evolução da NSM</div>
+                      {nsmSeriesLabel && (
+                        <div className="text-[11px] text-[var(--text-dim)] truncate max-w-[220px]">{nsmSeriesLabel}</div>
+                      )}
+                    </div>
+                    {nsmChartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={180}>
+                        <LineChart data={nsmChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                          <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                          <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                          <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
+                          <Legend wrapperStyle={{fontSize:11}}/>
+                          <Line type="monotone" dataKey="Valor" stroke="var(--green)" strokeWidth={2} dot={{fill:"var(--green)",r:3}}/>
+                          <Line type="monotone" dataKey="Meta" stroke="var(--yellow)" strokeWidth={2} strokeDasharray="4 3" dot={{fill:"var(--yellow)",r:3}}/>
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[180px] flex items-center justify-center flex-col gap-2.5 text-[var(--text-dim)]">
+                        <Clock size={28} className="text-[var(--text-dim)]" />
+                        <span className="text-xs">Sem coletas de NSM</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {nsmChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={180}>
-                    <LineChart data={nsmChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                      <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
-                      <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
-                      <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
-                      <Legend wrapperStyle={{fontSize:11}}/>
-                      <Line type="monotone" dataKey="Valor" stroke="var(--green)" strokeWidth={2} dot={{fill:"var(--green)",r:3}}/>
-                      <Line type="monotone" dataKey="Meta" stroke="var(--yellow)" strokeWidth={2} strokeDasharray="4 3" dot={{fill:"var(--yellow)",r:3}}/>
-                    </LineChart>
-                  </ResponsiveContainer>
+              )}
+
+              <div className="glass-card rounded-xl p-[18px_20px]">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Métricas NSM</div>
+                  <button
+                    className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                    onClick={() => setNsmWizard(true)}
+                  >
+                    <Plus size={14} /> Nova Coleta NSM
+                  </button>
+                </div>
+                {!project.NSMs || project.NSMs.length === 0 ? (
+                  <div className="text-[11px] text-[var(--text-dim)]">Nenhuma NSM cadastrada para este projeto.</div>
                 ) : (
-                  <div className="h-[180px] flex items-center justify-center flex-col gap-2.5 text-[var(--text-dim)]">
-                    <Clock size={28} className="text-[var(--text-dim)]" />
-                    <span className="text-xs">Sem coletas de NSM</span>
+                  <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto pr-2">
+                    {project.NSMs.map(nsm => {
+                      const cols = nsm.CollectionNSMs || [];
+                      const sorted = [...cols].sort((a,b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+                      const latest = sorted[0];
+                      const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
+
+                      let achievement = 0;
+                      if (isNumeric && latest) {
+                        const valNum = Number(latest.value) || 0;
+                        const tgtNum = Number(nsm.target) || 0;
+                        achievement = tgtNum > 0 ? (valNum / tgtNum) * 100 : 0;
+                      }
+
+                      return (
+                        <div key={nsm.id} className="bg-[var(--surface-high)] rounded-lg p-3 border border-[var(--border)]">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="text-xs font-bold text-[var(--text)]">{nsm.name}</div>
+                              <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">{nsm.type}</div>
+                            </div>
+                            {latest && isNumeric && (
+                              <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: achievement >= 100 ? 'var(--green-dim)' : achievement >= 80 ? 'rgba(245,158,11,0.1)' : 'rgba(244,63,94,0.1)', color: achievement >= 100 ? 'var(--green)' : achievement >= 80 ? 'var(--yellow)' : 'var(--red)' }}>
+                                {achievement.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          {latest ? (
+                            <>
+                              <div className="flex gap-4 text-[11px] mb-3">
+                                <div><span className="text-[var(--text-dim)]">Atual:</span> <span className="font-mono text-[var(--text)]">{isNumeric ? Number(latest.value).toLocaleString() : latest.value}</span></div>
+                                <div><span className="text-[var(--text-dim)]">Meta:</span> <span className="font-mono text-[var(--text)]">{isNumeric ? Number(nsm.target).toLocaleString() : nsm.target}</span></div>
+                              </div>
+                              {sorted.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-[var(--border)]">
+                                  <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Histórico</div>
+                                  <div className="max-h-[110px] overflow-y-auto">
+                                    <table className="w-full text-[10px] text-left">
+                                      <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--surface-high)]">
+                                        <tr>
+                                          <th className="py-1 font-medium">Data</th>
+                                          <th className="py-1 font-medium text-right">Valor</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-[var(--border)]">
+                                        {sorted.map((h: any, idx: number) => (
+                                          <tr key={idx}>
+                                            <td className="py-1 text-[var(--text-mid)]">
+                                              {h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime())
+                                                ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                                                : '-'}
+                                            </td>
+                                            <td className="py-1 text-right font-mono text-[var(--text)]">{isNumeric ? Number(h.value).toLocaleString() : h.value}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-[11px] text-[var(--text-dim)]">Sem dados coletados</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
-            </div>
+            </>
           )}
 
-          {/* NSM Metrics List */}
-          {project.NSMs && project.NSMs.length > 0 && (
-            <div className="glass-card rounded-xl p-[18px_20px]">
-              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-4">Métricas NSM</div>
-              <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2">
-                {project.NSMs.map(nsm => {
-                  const cols = nsm.CollectionNSMs || [];
-                  const sorted = [...cols].sort((a,b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
-                  const latest = sorted[0];
-                  const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
-                  
-                  let achievement = 0;
-                  if (isNumeric && latest) {
-                    const valNum = Number(latest.value) || 0;
-                    const tgtNum = Number(nsm.target) || 0;
-                    achievement = tgtNum > 0 ? (valNum / tgtNum) * 100 : 0;
-                  }
-
-                  return (
-                    <div key={nsm.id} className="bg-[var(--surface-high)] rounded-lg p-3 border border-[var(--border)]">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <div className="text-xs font-bold text-[var(--text)]">{nsm.name}</div>
-                          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">{nsm.type}</div>
-                        </div>
-                        {latest && isNumeric && (
-                          <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: achievement >= 100 ? 'var(--green-dim)' : achievement >= 80 ? 'rgba(245,158,11,0.1)' : 'rgba(244,63,94,0.1)', color: achievement >= 100 ? 'var(--green)' : achievement >= 80 ? 'var(--yellow)' : 'var(--red)' }}>
-                            {achievement.toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
-                      {latest ? (
-                        <>
-                          <div className="flex gap-4 text-[11px] mb-3">
-                            <div><span className="text-[var(--text-dim)]">Atual:</span> <span className="font-mono text-[var(--text)]">{isNumeric ? Number(latest.value).toLocaleString() : latest.value}</span></div>
-                            <div><span className="text-[var(--text-dim)]">Meta:</span> <span className="font-mono text-[var(--text)]">{isNumeric ? Number(nsm.target).toLocaleString() : nsm.target}</span></div>
-                          </div>
-                          
-                          {/* History Table */}
-                          {sorted.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-[var(--border)]">
-                              <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Histórico</div>
-                              <div className="max-h-[100px] overflow-y-auto">
-                                <table className="w-full text-[10px] text-left">
-                                  <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--surface-high)]">
-                                    <tr>
-                                      <th className="py-1 font-medium">Data</th>
-                                      <th className="py-1 font-medium text-right">Valor</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-[var(--border)]">
-                                    {sorted.map((h: any, idx: number) => (
-                                      <tr key={idx}>
-                                        <td className="py-1 text-[var(--text-mid)]">
-                                          {h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime())
-                                            ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
-                                            : '-'}
-                                        </td>
-                                        <td className="py-1 text-right font-mono text-[var(--text)]">{isNumeric ? Number(h.value).toLocaleString() : h.value}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-[11px] text-[var(--text-dim)]">Sem dados coletados</div>
-                      )}
-                    </div>
-                  );
-                })}
+          {productTab === 'pe' && (
+            <>
+              <div className="glass-card rounded-xl p-[18px_20px]">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Indicadores do Planejamento (PE)</div>
+                    <div className="text-[12px] text-[var(--text-dim)] mt-1">Cadastre OKRs e acompanhe resultados-chaves com coletas ao longo do ano.</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={peYear}
+                      onChange={(e) => setPeYear(Number(e.target.value))}
+                      className="bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text)] text-[13px] outline-none"
+                    >
+                      {availablePeYears.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                      onClick={() => setIsOkrModalOpen(true)}
+                    >
+                      <Plus size={14} /> Adicionar OKR
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+
+              {(project.OKRs || []).filter((o: any) => Number(o.baseYear) === peYear).length === 0 ? (
+                <div className="glass-card rounded-xl text-center p-12 text-[var(--text-dim)]">
+                  <div className="text-[15px] text-[var(--text-mid)] font-semibold">Sem OKRs para {peYear}</div>
+                  <div className="text-[13px] mt-2">Clique em “Adicionar OKR” para começar.</div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {(project.OKRs || [])
+                    .filter((o: any) => Number(o.baseYear) === peYear)
+                    .map((okr: any) => (
+                      <div key={okr.id} className="glass-card rounded-xl p-[18px_20px]">
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <div className="min-w-0">
+                            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Objetivo</div>
+                            <div className="text-[15px] font-bold text-[var(--text)] mt-1 break-words">{okr.objectiveName}</div>
+                            <div className="text-[12px] text-[var(--text-dim)] mt-1">Ano base: {okr.baseYear}</div>
+                          </div>
+                          <button
+                            className="bg-[var(--surface-high)] border border-[var(--border)] text-[var(--text)] px-3 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+                            onClick={async () => {
+                              const name = prompt('Nome do Resultado-Chave');
+                              if (!name) return;
+                              await addOkrKeyResult({ okrId: okr.id, name });
+                            }}
+                          >
+                            <Plus size={14} /> Adicionar KR
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {(okr.KeyResults || []).map((kr: any) => (
+                            <KeyResultCard
+                              key={kr.id}
+                              kr={kr}
+                              onEdit={() => setEditingKr(kr)}
+                              onCollect={() => setCollectingKr(kr)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* Formula */}
@@ -464,6 +586,400 @@ export function Projects() {
             setNsmWizard(false);
           }}
         />
+      )}
+
+      {isOkrModalOpen && project && (
+        <OkrCreateModal
+          projectId={project.id}
+          defaultYear={peYear}
+          onClose={() => setIsOkrModalOpen(false)}
+          onSave={async (payload) => {
+            const okr = await addOKR(payload);
+            for (const krName of payload.keyResults) {
+              await addOkrKeyResult({ okrId: okr.id, name: krName });
+            }
+            setIsOkrModalOpen(false);
+          }}
+        />
+      )}
+
+      {editingKr && (
+        <KeyResultEditModal
+          kr={editingKr}
+          onClose={() => setEditingKr(null)}
+          onSave={async (data) => {
+            await updateOkrKeyResult(editingKr.id, data);
+            setEditingKr(null);
+          }}
+        />
+      )}
+
+      {collectingKr && (
+        <KeyResultCollectModal
+          kr={collectingKr}
+          onClose={() => setCollectingKr(null)}
+          onSave={async (data) => {
+            await addCollectionOkrKeyResult({ okrKeyResultId: collectingKr.id, ...data });
+            setCollectingKr(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TabInline({ id, label, active, onClick }: { id: any; label: string; active: any; onClick: (id: any) => void }) {
+  const isActive = active === id;
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={`px-3 py-2 rounded-md text-xs font-semibold transition-colors ${isActive ? 'bg-[var(--surface-high)] text-[var(--text)] border border-[var(--border)]' : 'bg-transparent text-[var(--text-dim)] hover:text-[var(--text)]'}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function OkrCreateModal({ projectId, defaultYear, onClose, onSave }: { projectId: number; defaultYear: number; onClose: () => void; onSave: (payload: any) => Promise<void> }) {
+  const [objectiveName, setObjectiveName] = useState('');
+  const [baseYear, setBaseYear] = useState<number>(defaultYear);
+  const [keyResults, setKeyResults] = useState<string[]>(['']);
+
+  const canSave = objectiveName.trim().length > 0 && keyResults.some(k => k.trim().length > 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="flex justify-between items-center p-5 sm:p-6 border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-bold truncate">Novo OKR</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Defina o objetivo e um ou mais resultados-chaves.</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Ano base</label>
+              <input
+                type="number"
+                value={baseYear}
+                onChange={(e) => setBaseYear(Number(e.target.value))}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Projeto</label>
+              <input
+                value={projectId}
+                disabled
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-dim)] outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Nome do Objetivo</label>
+            <input
+              value={objectiveName}
+              onChange={(e) => setObjectiveName(e.target.value)}
+              className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              placeholder="Ex: Aumentar eficiência operacional"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Resultados-Chaves</label>
+              <button
+                onClick={() => setKeyResults([...keyResults, ''])}
+                className="text-xs font-semibold text-[var(--accent)] hover:opacity-80"
+              >
+                + Adicionar
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {keyResults.map((kr, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input
+                    value={kr}
+                    onChange={(e) => setKeyResults(keyResults.map((k, i) => i === idx ? e.target.value : k))}
+                    className="flex-1 bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                    placeholder={`KR ${idx + 1} (ex: Reduzir tempo de entrega em 20%)`}
+                  />
+                  <button
+                    onClick={() => setKeyResults(keyResults.filter((_, i) => i !== idx))}
+                    className="px-3 py-2 bg-[var(--surface-high)] border border-[var(--border)] rounded-lg text-[var(--red)] hover:opacity-80"
+                    disabled={keyResults.length === 1}
+                    title="Remover"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6 border-t border-[var(--border)] flex justify-end gap-3 shrink-0 bg-[var(--surface)]">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-mid)] hover:text-[var(--text)]">Cancelar</button>
+          <button
+            onClick={() => onSave({ projectId, baseYear, objectiveName, keyResults: keyResults.map(k => k.trim()).filter(Boolean) })}
+            disabled={!canSave}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-opacity ${canSave ? 'bg-[var(--accent)] text-white hover:opacity-80' : 'bg-[var(--surface-high)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
+          >
+            Salvar OKR
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyResultEditModal({ kr, onClose, onSave }: { kr: any; onClose: () => void; onSave: (data: any) => Promise<void> }) {
+  const [name, setName] = useState(kr?.name || '');
+  const [calcMemory, setCalcMemory] = useState(kr?.calcMemory || '');
+  const [source, setSource] = useState(kr?.source || '');
+  const [globalTarget, setGlobalTarget] = useState(kr?.globalTarget ?? '');
+
+  const canSave = name.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="flex justify-between items-center p-5 sm:p-6 border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-bold truncate">Editar Resultado-Chave</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5 truncate">{kr?.name}</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Nome do Resultado-Chave</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Meta Global (final do ano)</label>
+              <input
+                type="number"
+                value={globalTarget}
+                onChange={(e) => setGlobalTarget(e.target.value)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Fonte da Informação</label>
+              <input
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                placeholder="Ex: PowerBI, GA4, ERP"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Memória do Cálculo</label>
+            <textarea
+              value={calcMemory}
+              onChange={(e) => setCalcMemory(e.target.value)}
+              className="w-full min-h-[120px] bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              placeholder="Descreva como o indicador é calculado"
+            />
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6 border-t border-[var(--border)] flex justify-end gap-3 shrink-0 bg-[var(--surface)]">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-mid)] hover:text-[var(--text)]">Cancelar</button>
+          <button
+            onClick={() => onSave({ name, calcMemory, source, globalTarget: globalTarget === '' ? null : Number(globalTarget) })}
+            disabled={!canSave}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-opacity ${canSave ? 'bg-[var(--accent)] text-white hover:opacity-80' : 'bg-[var(--surface-high)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
+          >
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyResultCollectModal({ kr, onClose, onSave }: { kr: any; onClose: () => void; onSave: (data: any) => Promise<void> }) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [targetAtDate, setTargetAtDate] = useState('');
+  const [valueObtained, setValueObtained] = useState('');
+  const [observation, setObservation] = useState('');
+
+  const canSave = date && targetAtDate !== '' && valueObtained !== '';
+
+  return (
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="flex justify-between items-center p-5 sm:p-6 border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-bold truncate">Nova Coleta — Resultado-Chave</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5 truncate">{kr?.name}</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Data da Coleta</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Meta na Coleta</label>
+              <input
+                type="number"
+                value={targetAtDate}
+                onChange={(e) => setTargetAtDate(e.target.value)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Valor Obtido</label>
+              <input
+                type="number"
+                value={valueObtained}
+                onChange={(e) => setValueObtained(e.target.value)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-wider">Observação</label>
+            <textarea
+              value={observation}
+              onChange={(e) => setObservation(e.target.value)}
+              className="w-full min-h-[110px] bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+              placeholder="Contexto, exceções, evidências, etc."
+            />
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6 border-t border-[var(--border)] flex justify-end gap-3 shrink-0 bg-[var(--surface)]">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-[var(--text-mid)] hover:text-[var(--text)]">Cancelar</button>
+          <button
+            onClick={() => onSave({ date, targetAtDate: Number(targetAtDate), valueObtained: Number(valueObtained), observation })}
+            disabled={!canSave}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-opacity ${canSave ? 'bg-[var(--accent)] text-white hover:opacity-80' : 'bg-[var(--surface-high)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
+          >
+            Salvar Coleta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyResultCard({ kr, onEdit, onCollect }: { kr: any; onEdit: () => void; onCollect: () => void }) {
+  const [expanded, setExpanded] = useState(true);
+  const cols = kr?.Collections || [];
+  const sortedDesc = [...cols].sort((a: any, b: any) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+  const sortedAsc = [...cols].sort((a: any, b: any) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0));
+
+  const chartData = sortedAsc.map((c: any) => ({
+    date: c.date && !isNaN(new Date(c.date).getTime())
+      ? format(new Date(c.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+      : fmtDate(c.date || ''),
+    Meta: Number(c.targetAtDate) || 0,
+    Obtido: Number(c.valueObtained) || 0
+  }));
+
+  return (
+    <div className="bg-[var(--surface-high)] rounded-lg p-4 border border-[var(--border)]">
+      <div className="flex justify-between items-start gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px] font-bold text-[var(--text)] break-words">{kr?.name}</div>
+          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-1">
+            Meta global: {kr?.globalTarget ?? '—'}
+          </div>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => setExpanded(!expanded)} className="px-2 py-1 bg-[var(--surface)] border border-[var(--border)] rounded-md text-[11px] font-semibold text-[var(--text-mid)] hover:text-[var(--text)]">
+            {expanded ? 'Recolher' : 'Expandir'}
+          </button>
+          <button onClick={onEdit} className="px-2 py-1 bg-[var(--surface)] border border-[var(--border)] rounded-md text-[11px] font-semibold text-[var(--accent)] hover:opacity-80">
+            Editar
+          </button>
+          <button onClick={onCollect} className="px-2 py-1 bg-[var(--green)] text-white rounded-md text-[11px] font-bold hover:opacity-80">
+            Coletar
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 space-y-3">
+          <div className="h-[180px]">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                  <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                  <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                  <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
+                  <Legend wrapperStyle={{fontSize:11}}/>
+                  <Line type="monotone" dataKey="Obtido" stroke="var(--green)" strokeWidth={2} dot={{fill:"var(--green)",r:3}}/>
+                  <Line type="monotone" dataKey="Meta" stroke="var(--yellow)" strokeWidth={2} strokeDasharray="4 3" dot={{fill:"var(--yellow)",r:3}}/>
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[11px] text-[var(--text-dim)]">Sem coletas</div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-[var(--border)]">
+            <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">Analítico (mais recente primeiro)</div>
+            {sortedDesc.length === 0 ? (
+              <div className="text-[11px] text-[var(--text-dim)]">Nenhuma coleta registrada.</div>
+            ) : (
+              <div className="max-h-[160px] overflow-y-auto">
+                <table className="w-full text-[10px] text-left">
+                  <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--surface-high)]">
+                    <tr>
+                      <th className="py-1 font-medium">Data</th>
+                      <th className="py-1 font-medium text-right">Meta</th>
+                      <th className="py-1 font-medium text-right">Obtido</th>
+                      <th className="py-1 font-medium">Obs.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {sortedDesc.map((c: any) => (
+                      <tr key={c.id}>
+                        <td className="py-1 text-[var(--text-mid)]">
+                          {c.date && !isNaN(new Date(c.date.split('T')[0] + 'T12:00:00Z').getTime())
+                            ? format(new Date(c.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                            : '-'}
+                        </td>
+                        <td className="py-1 text-right font-mono text-[var(--text)]">{Number(c.targetAtDate).toLocaleString()}</td>
+                        <td className="py-1 text-right font-mono text-[var(--text)]">{Number(c.valueObtained).toLocaleString()}</td>
+                        <td className="py-1 text-[var(--text-mid)] truncate max-w-[160px]" title={c.observation || ''}>{c.observation || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
