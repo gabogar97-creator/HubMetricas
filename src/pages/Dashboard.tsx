@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { format, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChartBar, Target, Plus, X } from 'lucide-react';
+import { ChartBar, Target, Plus, X, Trash2 } from 'lucide-react';
 
 const fmt = (n: number | null) => n == null || isNaN(n) ? "R$ —" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 const fmtShort = (n: number | null) => { if (n == null || isNaN(n)) return "—"; const a = Math.abs(n); if (a >= 1e6) return `R$ ${(n/1e6).toFixed(1)}M`; if (a >= 1e3) return `R$ ${(n/1e3).toFixed(1)}K`; return fmt(n); };
@@ -13,13 +13,25 @@ const fmtMonths = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? 
 const fmtRatio = (n: number | null) => n == null || isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2).replace('.', ',');
 
 export function Dashboard() {
-  const { projects, refreshData, addCollectionNSM } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'roi' | 'nsm'>('roi');
+  const {
+    projects,
+    refreshData,
+    addCollectionNSM,
+    addOKR,
+    addOkrKeyResult,
+    updateOkrKeyResult,
+    addCollectionOkrKeyResult
+  } = useAppContext();
+  const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
   const [isNsmModalOpen, setIsNsmModalOpen] = useState(false);
   const [newNsmId, setNewNsmId] = useState('');
   const [newNsmDate, setNewNsmDate] = useState(new Date().toISOString().split('T')[0]);
   const [newNsmValue, setNewNsmValue] = useState('');
+  const [peYear, setPeYear] = useState<number>(new Date().getFullYear());
+  const [isOkrModalOpen, setIsOkrModalOpen] = useState(false);
+  const [editingKr, setEditingKr] = useState<any | null>(null);
+  const [collectingKr, setCollectingKr] = useState<any | null>(null);
   const navigate = useNavigate();
 
   const getLatestAccumulatedValue = (rows: any[], type: string) => {
@@ -47,6 +59,36 @@ export function Dashboard() {
     });
     return list;
   }, [projects]);
+
+  const allOkrs = useMemo(() => {
+    const list: any[] = [];
+    projects.forEach((p: any) => {
+      (p.OKRs || []).forEach((o: any) => {
+        list.push({
+          ...o,
+          projectId: p.id,
+          projectName: p.name
+        });
+      });
+    });
+    return list;
+  }, [projects]);
+
+  const availablePeYears = useMemo(() => {
+    const years = new Set<number>();
+    allOkrs.forEach((o: any) => {
+      const y = Number(o.baseYear);
+      if (!Number.isNaN(y) && y > 0) years.add(y);
+    });
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allOkrs]);
+
+  useEffect(() => {
+    if (!availablePeYears.includes(peYear) && availablePeYears.length > 0) {
+      setPeYear(availablePeYears[0]);
+    }
+  }, [availablePeYears, peYear]);
 
   const {
     totalInvestment,
@@ -262,6 +304,14 @@ export function Dashboard() {
           }`}
         >
           Visão de Produto (NSM)
+        </button>
+        <button
+          onClick={() => setActiveTab('pe')}
+          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+            activeTab === 'pe' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+          }`}
+        >
+          Indicadores do Planejamento (PE)
         </button>
       </div>
 
@@ -501,6 +551,86 @@ export function Dashboard() {
         </>
       )}
 
+      {activeTab === 'pe' && (
+        <>
+          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <div>
+                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Indicadores do Planejamento (PE)</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">Cadastre OKRs e acompanhe resultados-chaves com coletas ao longo do ano.</div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
+                <select
+                  value={peYear}
+                  onChange={(e) => setPeYear(Number(e.target.value))}
+                  className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors w-full sm:w-auto"
+                >
+                  {availablePeYears.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setIsOkrModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors w-full sm:w-auto"
+                >
+                  <Plus size={14} />
+                  Adicionar OKR
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {allOkrs.filter((o: any) => Number(o.baseYear) === peYear).length === 0 ? (
+            <div className="glass-card rounded-xl text-center p-12 text-[var(--text-dim)]">
+              <div className="text-[15px] text-[var(--text-mid)] font-semibold">Sem OKRs para {peYear}</div>
+              <div className="text-[13px] mt-2">Clique em “Adicionar OKR” para começar.</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-[14px]">
+              {allOkrs
+                .filter((o: any) => Number(o.baseYear) === peYear)
+                .map((okr: any) => (
+                  <div key={`${okr.projectId}-${okr.id}`} className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Objetivo</div>
+                        <div className="text-[15px] font-bold text-[var(--text)] mt-1 break-words">{okr.objectiveName}</div>
+                        <div className="text-[12px] text-[var(--text-dim)] mt-1">Projeto: {okr.projectName} · Ano base: {okr.baseYear}</div>
+                      </div>
+                      <button
+                        className="bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans hover:opacity-80 transition-opacity shrink-0"
+                        onClick={async () => {
+                          const name = prompt('Nome do Resultado-Chave');
+                          if (!name) return;
+                          await addOkrKeyResult({ okrId: okr.id, name });
+                        }}
+                      >
+                        <span className="inline-flex items-center gap-2"><Plus size={14} />Adicionar KR</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
+                      {(okr.KeyResults || []).map((kr: any) => (
+                        <KeyResultCard
+                          key={kr.id}
+                          kr={kr}
+                          onEdit={() => setEditingKr(kr)}
+                          onCollect={() => setCollectingKr(kr)}
+                        />
+                      ))}
+                      {(okr.KeyResults || []).length === 0 && (
+                        <div className="glass-card rounded-lg p-8 text-center text-[13px] text-[var(--text-dim)]">
+                          Nenhum resultado-chave ainda.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </>
+      )}
+
       {isNsmModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
@@ -537,6 +667,358 @@ export function Dashboard() {
         </div>
       )}
 
+      {isOkrModalOpen && (
+        <OkrCreateModal
+          projects={projects}
+          defaultYear={peYear}
+          onClose={() => setIsOkrModalOpen(false)}
+          onSave={async (payload) => {
+            const okr = await addOKR(payload);
+            for (const krName of payload.keyResults) {
+              await addOkrKeyResult({ okrId: okr.id, name: krName });
+            }
+            setIsOkrModalOpen(false);
+          }}
+        />
+      )}
+
+      {editingKr && (
+        <KeyResultEditModal
+          kr={editingKr}
+          onClose={() => setEditingKr(null)}
+          onSave={async (data) => {
+            await updateOkrKeyResult(editingKr.id, data);
+            setEditingKr(null);
+          }}
+        />
+      )}
+
+      {collectingKr && (
+        <KeyResultCollectModal
+          kr={collectingKr}
+          onClose={() => setCollectingKr(null)}
+          onSave={async (data) => {
+            await addCollectionOkrKeyResult({ okrKeyResultId: collectingKr.id, ...data });
+            setCollectingKr(null);
+          }}
+        />
+      )}
+
+    </div>
+  );
+}
+
+function OkrCreateModal({ projects, defaultYear, onClose, onSave }: { projects: any[]; defaultYear: number; onClose: () => void; onSave: (payload: any) => Promise<void> }) {
+  const [projectId, setProjectId] = useState<string>(projects[0]?.id?.toString?.() || '');
+  const [objectiveName, setObjectiveName] = useState('');
+  const [baseYear, setBaseYear] = useState<number>(defaultYear);
+  const [keyResults, setKeyResults] = useState<string[]>(['']);
+
+  const canSave = projectId && objectiveName.trim().length > 0 && keyResults.some(k => k.trim().length > 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <div>
+            <h3 className="font-semibold text-[var(--text)]">Novo OKR</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Defina o objetivo e um ou mais resultados-chaves.</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Projeto</label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+              >
+                <option value="">Selecione um projeto...</option>
+                {projects.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Ano base</label>
+              <input
+                type="number"
+                value={baseYear}
+                onChange={(e) => setBaseYear(Number(e.target.value))}
+                className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Nome do Objetivo</label>
+            <input
+              value={objectiveName}
+              onChange={(e) => setObjectiveName(e.target.value)}
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+              placeholder="Ex: Aumentar eficiência operacional"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Resultados-Chaves</label>
+              <button
+                onClick={() => setKeyResults([...keyResults, ''])}
+                className="text-xs font-semibold text-[var(--accent)] hover:opacity-80"
+              >
+                + Adicionar
+              </button>
+            </div>
+            <div className="space-y-2">
+              {keyResults.map((kr, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input
+                    value={kr}
+                    onChange={(e) => setKeyResults(keyResults.map((k, i) => i === idx ? e.target.value : k))}
+                    className="flex-1 bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                    placeholder={`KR ${idx + 1} (ex: Reduzir tempo de entrega em 20%)`}
+                  />
+                  <button
+                    onClick={() => setKeyResults(keyResults.filter((_, i) => i !== idx))}
+                    disabled={keyResults.length === 1}
+                    className="px-3 py-2.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--red)] hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Remover"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Cancelar</button>
+            <button
+              disabled={!canSave}
+              onClick={() => onSave({ projectId: Number(projectId), baseYear, objectiveName, keyResults: keyResults.map(k => k.trim()).filter(Boolean) })}
+              className={`px-4 py-2 rounded-md text-xs font-semibold transition-colors ${canSave ? 'bg-[var(--accent)] text-white hover:bg-[#33ddff]' : 'bg-[var(--bg4)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyResultEditModal({ kr, onClose, onSave }: { kr: any; onClose: () => void; onSave: (data: any) => Promise<void> }) {
+  const [name, setName] = useState(kr?.name || '');
+  const [calcMemory, setCalcMemory] = useState(kr?.calcMemory || '');
+  const [source, setSource] = useState(kr?.source || '');
+  const [globalTarget, setGlobalTarget] = useState(kr?.globalTarget ?? '');
+
+  const canSave = name.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <div>
+            <h3 className="font-semibold text-[var(--text)]">Editar Resultado-Chave</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5 truncate">{kr?.name}</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Nome do Resultado-Chave</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Meta Global (final do ano)</label>
+              <input type="number" value={globalTarget} onChange={(e) => setGlobalTarget(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Fonte da Informação</label>
+              <input value={source} onChange={(e) => setSource(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" placeholder="Ex: PowerBI, GA4, ERP" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Memória do Cálculo</label>
+            <textarea value={calcMemory} onChange={(e) => setCalcMemory(e.target.value)} className="w-full min-h-[120px] bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" placeholder="Descreva como o indicador é calculado" />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Cancelar</button>
+            <button
+              disabled={!canSave}
+              onClick={() => onSave({ name, calcMemory, source, globalTarget: globalTarget === '' ? null : Number(globalTarget) })}
+              className={`px-4 py-2 rounded-md text-xs font-semibold transition-colors ${canSave ? 'bg-[var(--accent)] text-white hover:bg-[#33ddff]' : 'bg-[var(--bg4)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyResultCollectModal({ kr, onClose, onSave }: { kr: any; onClose: () => void; onSave: (data: any) => Promise<void> }) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [targetAtDate, setTargetAtDate] = useState('');
+  const [valueObtained, setValueObtained] = useState('');
+  const [observation, setObservation] = useState('');
+
+  const canSave = date && targetAtDate !== '' && valueObtained !== '';
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <div>
+            <h3 className="font-semibold text-[var(--text)]">Nova Coleta — Resultado-Chave</h3>
+            <div className="text-[12px] text-[var(--text-dim)] mt-0.5 truncate">{kr?.name}</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Data da Coleta</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Meta na Coleta</label>
+              <input type="number" value={targetAtDate} onChange={(e) => setTargetAtDate(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Valor Obtido</label>
+              <input type="number" value={valueObtained} onChange={(e) => setValueObtained(e.target.value)} className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Observação</label>
+            <textarea value={observation} onChange={(e) => setObservation(e.target.value)} className="w-full min-h-[110px] bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors" placeholder="Contexto, exceções, evidências, etc." />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">Cancelar</button>
+            <button
+              disabled={!canSave}
+              onClick={() => onSave({ date, targetAtDate: Number(targetAtDate), valueObtained: Number(valueObtained), observation })}
+              className={`px-4 py-2 rounded-md text-xs font-semibold transition-colors ${canSave ? 'bg-[var(--accent)] text-white hover:bg-[#33ddff]' : 'bg-[var(--bg4)] text-[var(--text-dim)] opacity-60 cursor-not-allowed'}`}
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyResultCard({ kr, onEdit, onCollect }: { kr: any; onEdit: () => void; onCollect: () => void; key?: any }) {
+  const [expanded, setExpanded] = useState(true);
+  const cols = kr?.Collections || [];
+  const sortedDesc = [...cols].sort((a: any, b: any) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+  const sortedAsc = [...cols].sort((a: any, b: any) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0));
+
+  const chartData = sortedAsc.map((c: any) => ({
+    date: c.date && !isNaN(new Date(c.date).getTime())
+      ? format(new Date(c.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+      : '-',
+    Meta: Number(c.targetAtDate) || 0,
+    Obtido: Number(c.valueObtained) || 0
+  }));
+
+  return (
+    <div className="glass-card rounded-lg p-4">
+      <div className="flex justify-between items-start gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-bold text-[var(--text)] break-words">{kr?.name}</div>
+          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mt-1">Meta global: {kr?.globalTarget ?? '—'}</div>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => setExpanded(!expanded)} className="px-2 py-1 bg-[var(--bg4)] border border-[var(--border2)] rounded-md text-[11px] font-medium text-[var(--text3)] hover:text-[var(--text2)]">
+            {expanded ? 'Recolher' : 'Expandir'}
+          </button>
+          <button onClick={onEdit} className="px-2 py-1 bg-[var(--bg4)] border border-[var(--border2)] rounded-md text-[11px] font-medium text-[var(--accent)] hover:opacity-80">
+            Editar
+          </button>
+          <button onClick={onCollect} className="px-2 py-1 bg-[var(--green)] text-white rounded-md text-[11px] font-bold hover:opacity-80">
+            Coletar
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 space-y-3">
+          <div className="h-[180px]">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
+                  <XAxis dataKey="date" tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                  <YAxis tick={{fill:"var(--text-dim)",fontSize:10}} axisLine={false} tickLine={false}/>
+                  <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,fontSize:12}}/>
+                  <Legend wrapperStyle={{fontSize:11}}/>
+                  <Line type="monotone" dataKey="Obtido" stroke="var(--green)" strokeWidth={2} dot={{fill:"var(--green)",r:3}}/>
+                  <Line type="monotone" dataKey="Meta" stroke="var(--yellow)" strokeWidth={2} strokeDasharray="4 3" dot={{fill:"var(--yellow)",r:3}}/>
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[11px] text-[var(--text-dim)]">Sem coletas</div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-[var(--border)]">
+            <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">Analítico (mais recente primeiro)</div>
+            {sortedDesc.length === 0 ? (
+              <div className="text-[11px] text-[var(--text-dim)]">Nenhuma coleta registrada.</div>
+            ) : (
+              <div className="max-h-[160px] overflow-y-auto">
+                <table className="w-full text-[10px] text-left">
+                  <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--bg3)]">
+                    <tr>
+                      <th className="py-1 font-medium">Data</th>
+                      <th className="py-1 font-medium text-right">Meta</th>
+                      <th className="py-1 font-medium text-right">Obtido</th>
+                      <th className="py-1 font-medium">Obs.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {sortedDesc.map((c: any) => (
+                      <tr key={c.id}>
+                        <td className="py-1 text-[var(--text-mid)]">
+                          {c.date && !isNaN(new Date(c.date.split('T')[0] + 'T12:00:00Z').getTime())
+                            ? format(new Date(c.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                            : '-'}
+                        </td>
+                        <td className="py-1 text-right font-mono text-[var(--text)]">{Number(c.targetAtDate).toLocaleString()}</td>
+                        <td className="py-1 text-right font-mono text-[var(--text)]">{Number(c.valueObtained).toLocaleString()}</td>
+                        <td className="py-1 text-[var(--text-mid)] truncate max-w-[160px]" title={c.observation || ''}>{c.observation || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
