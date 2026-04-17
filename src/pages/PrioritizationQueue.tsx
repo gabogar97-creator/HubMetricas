@@ -103,7 +103,11 @@ export function PrioritizationQueue() {
   };
 
   const filteredProjects = useMemo(() => {
-    return mockQueueProjects.filter((p: any) => p.status === queueListTab).filter(matchesFilters);
+    const base = mockQueueProjects.filter((p: any) => p.status === queueListTab).filter(matchesFilters);
+    if (queueListTab === 'to_prioritize') {
+      return [...base].sort((a: any, b: any) => (Number(b.estimatedRoi12m) || 0) - (Number(a.estimatedRoi12m) || 0));
+    }
+    return base;
   }, [mockQueueProjects, queueListTab, filterBu, filterSponsor, filterId, filterTitle]);
 
   const filteredAllProjects = useMemo(() => {
@@ -192,6 +196,12 @@ export function PrioritizationQueue() {
             />
           </div>
         </div>
+
+        {queueListTab === 'to_prioritize' && (
+          <div className="text-[12px] text-[var(--text-dim)] mb-4">
+            A lista ordena por padrão os projetos de maior prioridade no topo, considerando o maior ROI estimado.
+          </div>
+        )}
 
         <QueueProjectsTable
           projects={filteredProjects}
