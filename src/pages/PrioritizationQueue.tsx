@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 export function PrioritizationQueue() {
   const [queueListTab, setQueueListTab] = useState<'to_prioritize' | 'prioritized'>('to_prioritize');
@@ -93,13 +94,12 @@ export function PrioritizationQueue() {
       try {
         setJiraLoading(true);
         setJiraError('');
-        const res = await fetch('/api/jira/prioritization-epics');
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json?.error || 'Falha ao consultar Jira.');
+        const { data, error } = await supabase.functions.invoke('jira-prioritization-epics');
+        if (error) {
+          throw new Error(error.message || 'Falha ao consultar Jira.');
         }
 
-        const issues = (json?.issues || []) as any[];
+        const issues = ((data as any)?.issues || []) as any[];
         const mapped = issues.map((i: any) => {
           const storyPointsOrDays = i?.customfield_10016;
           const cost = storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays))
