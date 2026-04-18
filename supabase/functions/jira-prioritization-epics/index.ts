@@ -14,20 +14,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    let jiraEmail = Deno.env.get("JIRA_EMAIL") || "";
-    let jiraApiToken = Deno.env.get("JIRA_API_TOKEN") || "";
+    const secretEmail = Deno.env.get("JIRA_EMAIL") || "";
+    const secretToken = Deno.env.get("JIRA_API_TOKEN") || "";
 
-    if ((!jiraEmail || !jiraApiToken) && req.method !== "GET") {
+    let bodyEmail = "";
+    let bodyToken = "";
+    if (req.method !== "GET") {
       const body = await req.json().catch(() => ({}));
-      if (!jiraEmail && body?.jiraEmail) jiraEmail = String(body.jiraEmail);
-      if (!jiraApiToken && body?.jiraApiToken) jiraApiToken = String(body.jiraApiToken);
+      bodyEmail = body?.jiraEmail ? String(body.jiraEmail) : "";
+      bodyToken = body?.jiraApiToken ? String(body.jiraApiToken) : "";
     }
+
+    const jiraEmail = bodyEmail || secretEmail;
+    const jiraApiToken = bodyToken || secretToken;
+    const credSource = bodyEmail && bodyToken ? "body" : (secretEmail && secretToken ? "secrets" : "none");
 
     if (!jiraEmail || !jiraApiToken) {
       return new Response(
         JSON.stringify({
           error:
             "Missing Jira credentials. Provide jiraEmail/jiraApiToken in request body (POC) or set JIRA_EMAIL/JIRA_API_TOKEN as Supabase secrets.",
+          meta: { credSource },
         }),
         {
           status: 500,
@@ -103,7 +110,7 @@ Deno.serve(async (req) => {
       customfield_10016: i?.fields?.customfield_10016,
     }));
 
-    return new Response(JSON.stringify({ issues: mapped }), {
+    return new Response(JSON.stringify({ issues: mapped, meta: { credSource } }), {
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",

@@ -15,10 +15,11 @@ export function PrioritizationQueue() {
   const [jiraError, setJiraError] = useState<string>('');
   const [jiraProjects, setJiraProjects] = useState<any[]>([]);
   const [jiraCredsModalOpen, setJiraCredsModalOpen] = useState(false);
-  const envJiraEmail = (import.meta as any)?.env?.VITE_JIRA_EMAIL as string | undefined;
-  const envJiraToken = (import.meta as any)?.env?.VITE_JIRA_API_TOKEN as string | undefined;
+  const envJiraEmail = import.meta.env.VITE_JIRA_EMAIL as string | undefined;
+  const envJiraToken = import.meta.env.VITE_JIRA_API_TOKEN as string | undefined;
   const [jiraEmailDraft, setJiraEmailDraft] = useState(envJiraEmail || 'gabriel.garcia@zucchetti.com');
   const [jiraTokenDraft, setJiraTokenDraft] = useState(envJiraToken || '');
+  const [jiraCredSource, setJiraCredSource] = useState<string>('');
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -106,6 +107,7 @@ export function PrioritizationQueue() {
       }
 
       const issues = ((data as any)?.issues || []) as any[];
+      setJiraCredSource(((data as any)?.meta?.credSource as string) || '');
       const mapped = issues.map((i: any) => {
           const storyPointsOrDays = i?.customfield_10016;
           const cost = storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays))
@@ -215,6 +217,10 @@ export function PrioritizationQueue() {
             )}
           </div>
         )}
+
+        <div className="mt-3 text-[11px] text-[var(--text-dim)]">
+          Debug Jira (POC): VITE_JIRA_EMAIL={envJiraEmail ? 'OK' : 'NÃO'} · VITE_JIRA_API_TOKEN={envJiraToken ? 'OK' : 'NÃO'}{jiraCredSource ? ` · credSource=${jiraCredSource}` : ''}
+        </div>
 
         {!isMethodologyCollapsed && (
           <div className="mt-4 text-[13px] text-[var(--text-mid)] leading-relaxed whitespace-pre-wrap">
