@@ -22,6 +22,32 @@ export function PrioritizationQueue() {
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
+  const jiraDescriptionToText = (desc: any): string => {
+    if (!desc) return '';
+    if (typeof desc === 'string') return desc;
+
+    const parts: string[] = [];
+    const walk = (node: any) => {
+      if (!node) return;
+      if (typeof node === 'string') {
+        parts.push(node);
+        return;
+      }
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (typeof node === 'object') {
+        if (typeof node.text === 'string') parts.push(node.text);
+        if (node.content) walk(node.content);
+      }
+    };
+
+    walk(desc);
+    const text = parts.join(' ').replace(/\s+/g, ' ').trim();
+    return text;
+  };
+
   const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string }) => {
     try {
       setJiraLoading(true);
@@ -45,13 +71,19 @@ export function PrioritizationQueue() {
             id: i?.id,
             jiraKey: i?.key,
             title: i?.summary,
+            jiraStatus: i?.status ?? '',
+            created: i?.created ?? '',
+            updated: i?.updated ?? '',
+            startDate: i?.startDate ?? '',
+            endDate: i?.endDate ?? '',
+            estimateDays: storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays)) ? Number(storyPointsOrDays) : null,
             bu: i?.customfield_10851 ?? '—',
             buArea: i?.customfield_10852 ?? '—',
             sponsor: i?.customfield_10853 ?? '—',
             estimatedRoi12m: i?.customfield_10848 != null && !isNaN(Number(i.customfield_10848)) ? Number(i.customfield_10848) : null,
             calcMemory: i?.customfield_10849 ?? '—',
             estimatedCost: cost,
-            scope: i?.description || '',
+            scope: jiraDescriptionToText(i?.description),
             effort: 'low',
             roi: i?.customfield_10848 != null && Number(i.customfield_10848) >= 0 ? 'high' : 'low',
             status: 'to_prioritize',
@@ -492,6 +524,30 @@ function ProjectDetailsModal({
   fmtCurrency: (n: number | null) => string;
   onClose: () => void;
 }) {
+  const fmtDateTime = (v: any) => {
+    if (!v) return '—';
+    const d = new Date(String(v));
+    if (Number.isNaN(d.getTime())) return String(v);
+    return new Intl.DateTimeFormat('pt-BR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(d);
+  };
+
+  const fmtDate = (v: any) => {
+    if (!v) return '—';
+    const d = new Date(String(v));
+    if (Number.isNaN(d.getTime())) return String(v);
+    return new Intl.DateTimeFormat('pt-BR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
@@ -506,6 +562,14 @@ function ProjectDetailsModal({
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Status (Jira)</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{project.jiraStatus || '—'}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Criado / Atualizado</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{fmtDateTime(project.created)} / {fmtDateTime(project.updated)}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU Origem</div>
               <div className="text-[13px] text-[var(--text)] mt-1">{project.bu}</div>
             </div>
@@ -518,8 +582,16 @@ function ProjectDetailsModal({
               <div className="text-[13px] text-[var(--text)] mt-1">{project.sponsor}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Início / Fim (Jira)</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{fmtDate(project.startDate)} / {fmtDate(project.endDate)}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Estimado</div>
               <div className="text-[13px] text-[var(--red)] font-semibold mt-1">{fmtCurrency(project.estimatedCost)}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Estimativa (dias)</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{project.estimateDays == null || isNaN(Number(project.estimateDays)) ? '—' : Number(project.estimateDays)}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado (12m)</div>
@@ -528,18 +600,13 @@ function ProjectDetailsModal({
           </div>
 
           <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Memória do Cálculo</div>
-            <div className="text-[13px] text-[var(--text-mid)] mt-1 whitespace-pre-wrap">{project.calcMemory}</div>
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Memória do cálculo</div>
+            <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{project.calcMemory || '—'}</div>
           </div>
 
           <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Escopo (mock — futuramente Jira)</div>
-            <textarea
-              value={scope}
-              onChange={(e) => onChangeScope(e.target.value)}
-              className="w-full mt-2 min-h-[120px] bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
-              placeholder="Descreva o escopo (campo retornará do Jira no futuro)"
-            />
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Descrição (Jira)</div>
+            <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{scope || '—'}</div>
           </div>
 
           <div className="flex justify-end">
