@@ -15,8 +15,10 @@ export function PrioritizationQueue() {
   const [jiraError, setJiraError] = useState<string>('');
   const [jiraProjects, setJiraProjects] = useState<any[]>([]);
   const [jiraCredsModalOpen, setJiraCredsModalOpen] = useState(false);
-  const [jiraEmailDraft, setJiraEmailDraft] = useState('gabriel.garcia@zucchetti.com');
-  const [jiraTokenDraft, setJiraTokenDraft] = useState('');
+  const envJiraEmail = (import.meta as any)?.env?.VITE_JIRA_EMAIL as string | undefined;
+  const envJiraToken = (import.meta as any)?.env?.VITE_JIRA_API_TOKEN as string | undefined;
+  const [jiraEmailDraft, setJiraEmailDraft] = useState(envJiraEmail || 'gabriel.garcia@zucchetti.com');
+  const [jiraTokenDraft, setJiraTokenDraft] = useState(envJiraToken || '');
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -141,7 +143,7 @@ export function PrioritizationQueue() {
   };
 
   useEffect(() => {
-    loadJiraEpics();
+    loadJiraEpics(envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken } : undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
