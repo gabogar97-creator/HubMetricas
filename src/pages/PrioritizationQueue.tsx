@@ -191,7 +191,7 @@ export function PrioritizationQueue() {
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Metodologia de Priorização</div>
             <div className="text-[12px] text-[var(--text-dim)] mt-1">Descrição do método adotado para entrada no roadmap.</div>
@@ -199,7 +199,7 @@ export function PrioritizationQueue() {
           <button
             type="button"
             onClick={() => setIsMethodologyCollapsed(!isMethodologyCollapsed)}
-            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors shrink-0"
+            className="w-full sm:w-auto px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors shrink-0"
           >
             {isMethodologyCollapsed ? 'Expandir' : 'Recolher'}
           </button>
@@ -224,7 +224,7 @@ export function PrioritizationQueue() {
       </div>
 
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Matriz Valor vs Esforço</div>
             <div className="text-[12px] text-[var(--text-dim)] mt-1">Quick Wins, Big Bets, Preenche fila e Não entram.</div>
@@ -232,7 +232,7 @@ export function PrioritizationQueue() {
           <button
             type="button"
             onClick={() => setIsMatrixCollapsed(!isMatrixCollapsed)}
-            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors shrink-0"
+            className="w-full sm:w-auto px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors shrink-0"
           >
             {isMatrixCollapsed ? 'Expandir' : 'Recolher'}
           </button>
