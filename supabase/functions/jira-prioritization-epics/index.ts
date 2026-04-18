@@ -14,12 +14,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const jiraEmail = Deno.env.get("JIRA_EMAIL");
-    const jiraApiToken = Deno.env.get("JIRA_API_TOKEN");
+    let jiraEmail = Deno.env.get("JIRA_EMAIL") || "";
+    let jiraApiToken = Deno.env.get("JIRA_API_TOKEN") || "";
+
+    if ((!jiraEmail || !jiraApiToken) && req.method !== "GET") {
+      const body = await req.json().catch(() => ({}));
+      if (!jiraEmail && body?.jiraEmail) jiraEmail = String(body.jiraEmail);
+      if (!jiraApiToken && body?.jiraApiToken) jiraApiToken = String(body.jiraApiToken);
+    }
 
     if (!jiraEmail || !jiraApiToken) {
       return new Response(
-        JSON.stringify({ error: "Missing Jira credentials. Set JIRA_EMAIL and JIRA_API_TOKEN as Supabase secrets." }),
+        JSON.stringify({
+          error:
+            "Missing Jira credentials. Provide jiraEmail/jiraApiToken in request body (POC) or set JIRA_EMAIL/JIRA_API_TOKEN as Supabase secrets.",
+        }),
         {
           status: 500,
           headers: {

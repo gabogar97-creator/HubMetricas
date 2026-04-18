@@ -14,6 +14,9 @@ export function PrioritizationQueue() {
   const [jiraLoading, setJiraLoading] = useState(false);
   const [jiraError, setJiraError] = useState<string>('');
   const [jiraProjects, setJiraProjects] = useState<any[]>([]);
+  const [jiraCredsModalOpen, setJiraCredsModalOpen] = useState(false);
+  const [jiraEmailDraft, setJiraEmailDraft] = useState('gabriel.garcia@zucchetti.com');
+  const [jiraTokenDraft, setJiraTokenDraft] = useState('');
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -88,19 +91,20 @@ export function PrioritizationQueue() {
     return list;
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      try {
-        setJiraLoading(true);
-        setJiraError('');
-        const { data, error } = await supabase.functions.invoke('jira-prioritization-epics');
-        if (error) {
-          throw new Error(error.message || 'Falha ao consultar Jira.');
-        }
+  const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string }) => {
+    try {
+      setJiraLoading(true);
+      setJiraError('');
 
-        const issues = ((data as any)?.issues || []) as any[];
-        const mapped = issues.map((i: any) => {
+      const { data, error } = await supabase.functions.invoke('jira-prioritization-epics', {
+        body: opts?.jiraEmail && opts?.jiraApiToken ? { jiraEmail: opts.jiraEmail, jiraApiToken: opts.jiraApiToken } : undefined,
+      });
+      if (error) {
+        throw new Error(error.message || 'Falha ao consultar Jira.');
+      }
+
+      const issues = ((data as any)?.issues || []) as any[];
+      const mapped = issues.map((i: any) => {
           const storyPointsOrDays = i?.customfield_10016;
           const cost = storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays))
             ? Number(storyPointsOrDays) * 433
@@ -121,24 +125,24 @@ export function PrioritizationQueue() {
             roi: i?.customfield_10848 != null && Number(i.customfield_10848) >= 0 ? 'high' : 'low',
             status: 'to_prioritize',
           };
-        });
+      });
 
-        if (!cancelled) {
-          setJiraProjects(mapped);
-        }
-      } catch (e: any) {
-        console.error('Failed to load Jira epics:', e);
-        if (!cancelled) {
-          setJiraError(e?.message || 'Falha ao consultar Jira.');
-        }
-      } finally {
-        if (!cancelled) setJiraLoading(false);
+      setJiraProjects(mapped);
+    } catch (e: any) {
+      console.error('Failed to load Jira epics:', e);
+      const msg = e?.message || 'Falha ao consultar Jira.';
+      setJiraError(msg);
+      if (String(msg).toLowerCase().includes('missing jira credentials')) {
+        setJiraCredsModalOpen(true);
       }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
+    } finally {
+      setJiraLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadJiraEpics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const queueProjects = useMemo(() => {
@@ -327,6 +331,64 @@ export function PrioritizationQueue() {
           fmtCurrency={fmtCurrency}
           onClose={() => setSelectedProject(null)}
         />
+      )}
+
+      {jiraCredsModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-md overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <div>
+                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Conectar ao Jira (POC)</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">Modo temporário: não persiste credenciais, mas expõe no tráfego do navegador.</div>
+              </div>
+              <button onClick={() => setJiraCredsModalOpen(false)} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">✕</button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="space-y-1">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Email</div>
+                <input
+                  value={jiraEmailDraft}
+                  onChange={(e) => setJiraEmailDraft(e.target.value)}
+                  className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">API Token</div>
+                <input
+                  type="password"
+                  value={jiraTokenDraft}
+                  onChange={(e) => setJiraTokenDraft(e.target.value)}
+                  className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                  placeholder="Cole o token do Atlassian"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                  onClick={() => setJiraCredsModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={jiraLoading || !jiraEmailDraft || !jiraTokenDraft}
+                  className={`px-4 py-2 rounded-md text-xs font-semibold text-white transition-opacity ${
+                    jiraLoading || !jiraEmailDraft || !jiraTokenDraft
+                      ? 'bg-[var(--accent)] opacity-60 cursor-not-allowed'
+                      : 'bg-[var(--accent)] hover:opacity-90'
+                  }`}
+                  onClick={async () => {
+                    setJiraCredsModalOpen(false);
+                    await loadJiraEpics({ jiraEmail: jiraEmailDraft, jiraApiToken: jiraTokenDraft });
+                  }}
+                >
+                  Conectar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
