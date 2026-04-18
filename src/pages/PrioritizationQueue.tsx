@@ -22,77 +22,6 @@ export function PrioritizationQueue() {
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
-  const mockQueueProjects = useMemo(() => {
-    const list = [
-      {
-        id: 'IA-1001',
-        jiraKey: 'IA-1001',
-        title: 'Projeto de IA',
-        bu: 'BU Varejo',
-        sponsor: 'Diretoria BU',
-        estimatedCost: 85000,
-        estimatedRoi12m: 16000,
-        calcMemory: 'Saving estimado via redução de horas manuais × custo hora.',
-        effort: 'low' as const,
-        roi: 'high' as const,
-        status: 'to_prioritize' as const,
-      },
-      {
-        id: 'IA-1020',
-        jiraKey: 'IA-1020',
-        title: 'Automação de triagem de tickets',
-        bu: 'BU Serviços',
-        sponsor: 'Operações',
-        estimatedCost: 120000,
-        estimatedRoi12m: 240000,
-        calcMemory: 'Receita adicional por aumento de capacidade + redução de churn.',
-        effort: 'high' as const,
-        roi: 'high' as const,
-        status: 'to_prioritize' as const,
-      },
-      {
-        id: 'IA-1102',
-        jiraKey: 'IA-1102',
-        title: 'Copiloto para suporte interno',
-        bu: 'BU Corporativo',
-        sponsor: 'TI',
-        estimatedCost: 65000,
-        estimatedRoi12m: 9000,
-        calcMemory: 'Saving por redução de tempo de atendimento e retrabalho.',
-        effort: 'low' as const,
-        roi: 'low' as const,
-        status: 'to_prioritize' as const,
-      },
-      {
-        id: 'IA-1150',
-        jiraKey: 'IA-1150',
-        title: 'Predição de demanda multi-produto',
-        bu: 'BU Indústria',
-        sponsor: 'Planejamento',
-        estimatedCost: 220000,
-        estimatedRoi12m: 12000,
-        calcMemory: 'Receita via redução de ruptura e aumento de disponibilidade.',
-        effort: 'high' as const,
-        roi: 'low' as const,
-        status: 'to_prioritize' as const,
-      },
-      {
-        id: 'IA-1205',
-        jiraKey: 'IA-1205',
-        title: 'Classificação automática de documentos',
-        bu: 'BU Backoffice',
-        sponsor: 'Financeiro',
-        estimatedCost: 90000,
-        estimatedRoi12m: 180000,
-        calcMemory: 'Saving por redução de terceirização e tempo operacional.',
-        effort: 'low' as const,
-        roi: 'high' as const,
-        status: 'prioritized' as const,
-      },
-    ];
-    return list;
-  }, []);
-
   const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string }) => {
     try {
       setJiraLoading(true);
@@ -148,8 +77,8 @@ export function PrioritizationQueue() {
   }, []);
 
   const queueProjects = useMemo(() => {
-    return jiraProjects.length > 0 ? jiraProjects : mockQueueProjects;
-  }, [jiraProjects, mockQueueProjects]);
+    return jiraProjects;
+  }, [jiraProjects]);
 
   const availableBus = useMemo(() => {
     const set = new Set<string>();
@@ -211,7 +140,7 @@ export function PrioritizationQueue() {
               <div className="text-[12px] text-[var(--text-dim)]">Carregando itens do Jira…</div>
             )}
             {!jiraLoading && jiraError && (
-              <div className="text-[12px] text-[var(--red)]">{jiraError} (usando dados mockados como fallback)</div>
+              <div className="text-[12px] text-[var(--red)]">{jiraError}</div>
             )}
           </div>
         )}
@@ -318,11 +247,15 @@ export function PrioritizationQueue() {
           </div>
         )}
 
-        <QueueProjectsTable
-          projects={filteredProjects}
-          fmtCurrency={fmtCurrency}
-          onProjectClick={openProjectModal}
-        />
+        {jiraLoading && queueProjects.length === 0 ? (
+          <div className="p-8 text-center text-[13px] text-[var(--text-dim)]">Carregando projetos do Jira…</div>
+        ) : (
+          <QueueProjectsTable
+            projects={filteredProjects}
+            fmtCurrency={fmtCurrency}
+            onProjectClick={openProjectModal}
+          />
+        )}
       </div>
 
       {selectedProject && (
