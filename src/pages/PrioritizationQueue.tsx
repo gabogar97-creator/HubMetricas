@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 export function PrioritizationQueue() {
   const [queueListTab, setQueueListTab] = useState<'to_prioritize' | 'prioritized'>('to_prioritize');
@@ -10,6 +10,9 @@ export function PrioritizationQueue() {
   const [filterTitle, setFilterTitle] = useState('');
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [scopeDraft, setScopeDraft] = useState<string>('');
+  const [jiraLoading, setJiraLoading] = useState(false);
+  const [jiraError, setJiraError] = useState<string>('');
+  const [jiraProjects, setJiraProjects] = useState<any[]>([]);
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -84,17 +87,75 @@ export function PrioritizationQueue() {
     return list;
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setJiraLoading(true);
+        setJiraError('');
+        const res = await fetch('/api/jira/prioritization-epics');
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json?.error || 'Falha ao consultar Jira.');
+        }
+
+        const issues = (json?.issues || []) as any[];
+        const mapped = issues.map((i: any) => {
+          const storyPointsOrDays = i?.customfield_10016;
+          const cost = storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays))
+            ? Number(storyPointsOrDays) * 433
+            : null;
+
+          return {
+            id: i?.id,
+            jiraKey: i?.key,
+            title: i?.summary,
+            bu: i?.customfield_10851 ?? '—',
+            buArea: i?.customfield_10852 ?? '—',
+            sponsor: i?.customfield_10853 ?? '—',
+            estimatedRoi12m: i?.customfield_10848 != null && !isNaN(Number(i.customfield_10848)) ? Number(i.customfield_10848) : null,
+            calcMemory: i?.customfield_10849 ?? '—',
+            estimatedCost: cost,
+            scope: i?.description || '',
+            effort: 'low',
+            roi: i?.customfield_10848 != null && Number(i.customfield_10848) >= 0 ? 'high' : 'low',
+            status: 'to_prioritize',
+          };
+        });
+
+        if (!cancelled) {
+          setJiraProjects(mapped);
+        }
+      } catch (e: any) {
+        console.error('Failed to load Jira epics:', e);
+        if (!cancelled) {
+          setJiraError(e?.message || 'Falha ao consultar Jira.');
+        }
+      } finally {
+        if (!cancelled) setJiraLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const queueProjects = useMemo(() => {
+    return jiraProjects.length > 0 ? jiraProjects : mockQueueProjects;
+  }, [jiraProjects, mockQueueProjects]);
+
   const availableBus = useMemo(() => {
     const set = new Set<string>();
-    mockQueueProjects.forEach((p: any) => p?.bu && set.add(p.bu));
+    queueProjects.forEach((p: any) => p?.bu && set.add(p.bu));
     return Array.from(set).sort();
-  }, [mockQueueProjects]);
+  }, [queueProjects]);
 
   const availableSponsors = useMemo(() => {
     const set = new Set<string>();
-    mockQueueProjects.forEach((p: any) => p?.sponsor && set.add(p.sponsor));
+    queueProjects.forEach((p: any) => p?.sponsor && set.add(p.sponsor));
     return Array.from(set).sort();
-  }, [mockQueueProjects]);
+  }, [queueProjects]);
 
   const matchesFilters = (p: any) => {
     const buOk = !filterBu || String(p?.bu || '').toLowerCase() === filterBu.toLowerCase();
@@ -105,16 +166,16 @@ export function PrioritizationQueue() {
   };
 
   const filteredProjects = useMemo(() => {
-    const base = mockQueueProjects.filter((p: any) => p.status === queueListTab).filter(matchesFilters);
+    const base = queueProjects.filter((p: any) => p.status === queueListTab).filter(matchesFilters);
     if (queueListTab === 'to_prioritize') {
       return [...base].sort((a: any, b: any) => (Number(b.estimatedRoi12m) || 0) - (Number(a.estimatedRoi12m) || 0));
     }
     return base;
-  }, [mockQueueProjects, queueListTab, filterBu, filterSponsor, filterId, filterTitle]);
+  }, [queueProjects, queueListTab, filterBu, filterSponsor, filterId, filterTitle]);
 
   const filteredAllProjects = useMemo(() => {
-    return mockQueueProjects.filter(matchesFilters);
-  }, [mockQueueProjects, filterBu, filterSponsor, filterId, filterTitle]);
+    return queueProjects.filter(matchesFilters);
+  }, [queueProjects, filterBu, filterSponsor, filterId, filterTitle]);
 
   const openProjectModal = (p: any) => {
     setSelectedProject(p);
@@ -137,6 +198,17 @@ export function PrioritizationQueue() {
             {isMethodologyCollapsed ? 'Expandir' : 'Recolher'}
           </button>
         </div>
+
+        {(jiraLoading || jiraError) && (
+          <div className="mt-3">
+            {jiraLoading && (
+              <div className="text-[12px] text-[var(--text-dim)]">Carregando itens do Jira…</div>
+            )}
+            {!jiraLoading && jiraError && (
+              <div className="text-[12px] text-[var(--red)]">{jiraError} (usando dados mockados como fallback)</div>
+            )}
+          </div>
+        )}
 
         {!isMethodologyCollapsed && (
           <div className="mt-4 text-[13px] text-[var(--text-mid)] leading-relaxed whitespace-pre-wrap">
@@ -360,6 +432,7 @@ function QueueProjectsTable({
               'ID',
               'Título',
               'BU Origem',
+              'Área da BU',
               'Sponsor',
               'Custo Estimado',
               'ROI Estimado (12m)',
@@ -384,6 +457,7 @@ function QueueProjectsTable({
               <td className="p-[10px_12px] font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.title}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.bu}</td>
+              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.buArea || '—'}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.sponsor}</td>
               <td className="p-[10px_12px] text-[var(--red)] whitespace-nowrap">{fmtCurrency(p.estimatedCost)}</td>
               <td className="p-[10px_12px] text-[var(--green)] font-semibold whitespace-nowrap">{fmtCurrency(p.estimatedRoi12m)}</td>
@@ -392,7 +466,7 @@ function QueueProjectsTable({
           ))}
           {projects.length === 0 && (
             <tr>
-              <td colSpan={7} className="p-8 text-center text-[13px] text-[var(--text-dim)]">
+              <td colSpan={8} className="p-8 text-center text-[13px] text-[var(--text-dim)]">
                 Nenhum projeto nesta lista.
               </td>
             </tr>
@@ -432,6 +506,10 @@ function ProjectDetailsModal({
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU Origem</div>
               <div className="text-[13px] text-[var(--text)] mt-1">{project.bu}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Área da BU</div>
+              <div className="text-[13px] text-[var(--text)] mt-1">{project.buArea || '—'}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Sponsor</div>

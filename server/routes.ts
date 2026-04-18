@@ -320,4 +320,75 @@ export function setupRoutes(app: Express) {
       res.status(500).json({ error: String(error) });
     }
   });
+
+  app.get('/api/jira/prioritization-epics', async (req, res) => {
+    try {
+      const jiraEmail = process.env.JIRA_EMAIL;
+      const jiraApiToken = process.env.JIRA_API_TOKEN;
+
+      if (!jiraEmail || !jiraApiToken) {
+        return res.status(500).json({ error: 'Missing Jira credentials. Set JIRA_EMAIL and JIRA_API_TOKEN in server environment.' });
+      }
+
+      const jql = 'project=IA AND issuetype=Epic AND status IN ("AG. PRIORIZAÇÃO", "EM DEV PELO SOLICITANTE", "EM REFINAMENTO", "EM ANÁLISE") ORDER BY created DESC';
+      const fields = [
+        'summary',
+        'key',
+        'description',
+        'status',
+        'created',
+        'updated',
+        'startDate',
+        'endDate',
+        'customfield_10848',
+        'customfield_10849',
+        'customfield_10851',
+        'customfield_10852',
+        'customfield_10853',
+        'customfield_10016'
+      ].join(',');
+
+      const url = `https://zucchettibr.atlassian.net/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+      const auth = Buffer.from(`${jiraEmail}:${jiraApiToken}`).toString('base64');
+
+      const jiraRes = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: 'application/json'
+        }
+      });
+
+      if (!jiraRes.ok) {
+        const body = await jiraRes.text();
+        return res.status(jiraRes.status).json({ error: `Jira request failed: ${jiraRes.status}`, details: body });
+      }
+
+      const json: any = await jiraRes.json();
+      const issues = (json?.issues || []) as any[];
+
+      const mapped = issues.map((i: any) => ({
+        id: i?.id,
+        key: i?.key,
+        summary: i?.fields?.summary,
+        description: i?.fields?.description,
+        status: i?.fields?.status?.name,
+        created: i?.fields?.created,
+        updated: i?.fields?.updated,
+        startDate: i?.fields?.startDate,
+        endDate: i?.fields?.endDate,
+        customfield_10848: i?.fields?.customfield_10848,
+        customfield_10849: i?.fields?.customfield_10849,
+        customfield_10851: i?.fields?.customfield_10851,
+        customfield_10852: i?.fields?.customfield_10852,
+        customfield_10853: i?.fields?.customfield_10853,
+        customfield_10016: i?.fields?.customfield_10016
+      }));
+
+      return res.json({ issues: mapped });
+    } catch (error) {
+      console.error('Failed to fetch Jira prioritization epics:', error);
+      return res.status(500).json({ error: String(error) });
+    }
+  });
 }
