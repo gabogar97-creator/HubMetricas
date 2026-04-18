@@ -330,11 +330,16 @@ export function PrioritizationQueue() {
 }
 
 function QuadrantMatrix({ projects, fmtCurrency, onProjectClick }: { projects: any[]; fmtCurrency: (n: number | null) => string; onProjectClick: (p: any) => void }) {
+  const eligible = projects.filter((p) => p?.estimatedRoi12m != null && !isNaN(Number(p.estimatedRoi12m)));
+
+  const roiBucket = (p: any) => (Number(p.estimatedRoi12m) > 20000 ? 'high' : 'low');
+  const effortBucket = (p: any) => (p?.estimatedCost != null && !isNaN(Number(p.estimatedCost)) && Number(p.estimatedCost) > 12000 ? 'high' : 'low');
+
   const quadrantProjects = {
-    quickWins: projects.filter(p => p.roi === 'high' && p.effort === 'low'),
-    bigBets: projects.filter(p => p.roi === 'high' && p.effort === 'high'),
-    fillQueue: projects.filter(p => p.roi === 'low' && p.effort === 'low'),
-    dontEnter: projects.filter(p => p.roi === 'low' && p.effort === 'high'),
+    quickWins: eligible.filter((p) => roiBucket(p) === 'high' && effortBucket(p) === 'low'),
+    bigBets: eligible.filter((p) => roiBucket(p) === 'high' && effortBucket(p) === 'high'),
+    fillQueue: eligible.filter((p) => roiBucket(p) === 'low' && effortBucket(p) === 'low'),
+    dontEnter: eligible.filter((p) => roiBucket(p) === 'low' && effortBucket(p) === 'high'),
   };
 
   const ProjectLine = ({ p }: { p: any; key?: any }) => (
