@@ -19,7 +19,6 @@ export function PrioritizationQueue() {
   const envJiraToken = import.meta.env.VITE_JIRA_API_TOKEN as string | undefined;
   const [jiraEmailDraft, setJiraEmailDraft] = useState(envJiraEmail || 'gabriel.garcia@zucchetti.com');
   const [jiraTokenDraft, setJiraTokenDraft] = useState(envJiraToken || '');
-  const [jiraCredSource, setJiraCredSource] = useState<string>('');
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -107,7 +106,6 @@ export function PrioritizationQueue() {
       }
 
       const issues = ((data as any)?.issues || []) as any[];
-      setJiraCredSource(((data as any)?.meta?.credSource as string) || '');
       const mapped = issues.map((i: any) => {
           const storyPointsOrDays = i?.customfield_10016;
           const cost = storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays))
@@ -217,10 +215,6 @@ export function PrioritizationQueue() {
             )}
           </div>
         )}
-
-        <div className="mt-3 text-[11px] text-[var(--text-dim)]">
-          Debug Jira (POC): VITE_JIRA_EMAIL={envJiraEmail ? 'OK' : 'NÃO'} · VITE_JIRA_API_TOKEN={envJiraToken ? 'OK' : 'NÃO'}{jiraCredSource ? ` · credSource=${jiraCredSource}` : ''}
-        </div>
 
         {!isMethodologyCollapsed && (
           <div className="mt-4 text-[13px] text-[var(--text-mid)] leading-relaxed whitespace-pre-wrap">
@@ -525,7 +519,7 @@ function QueueProjectsTable({
               onClick={() => onProjectClick(p)}
             >
               <td className="p-[10px_12px] font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</td>
-              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.title}</td>
+              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-normal break-words max-w-[220px] leading-snug">{p.title}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.bu}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.buArea || '—'}</td>
               <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.sponsor}</td>
