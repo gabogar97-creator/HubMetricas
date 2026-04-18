@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       "customfield_10016",
     ].join(",");
 
-    const url = `${JIRA_BASE_URL}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+    const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
 
     const auth = btoa(`${jiraEmail}:${jiraApiToken}`);
 
