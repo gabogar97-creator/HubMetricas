@@ -25,7 +25,7 @@ export function Dashboard() {
     deleteOkrKeyResult,
     deleteCollectionOkrKeyResult
   } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe'>('roi');
+  const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe' | 'ops'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
   const [isNsmModalOpen, setIsNsmModalOpen] = useState(false);
   const [newNsmId, setNewNsmId] = useState('');
@@ -38,6 +38,73 @@ export function Dashboard() {
   const [editingKr, setEditingKr] = useState<any | null>(null);
   const [collectingKr, setCollectingKr] = useState<any | null>(null);
   const navigate = useNavigate();
+
+  const [opsRows, setOpsRows] = useState(() => (
+    [
+      {
+        date: '2026-02-14',
+        sprint: 'Sprint 1',
+        spEstimate: 32,
+        spDone: 28,
+        velocity: 28,
+        throughput: 9,
+        bugsVolume: 6,
+        deadlineAccuracy: 0.86,
+      },
+      {
+        date: '2026-02-28',
+        sprint: 'Sprint 2',
+        spEstimate: 34,
+        spDone: 31,
+        velocity: 31,
+        throughput: 10,
+        bugsVolume: 4,
+        deadlineAccuracy: 0.9,
+      },
+      {
+        date: '2026-03-14',
+        sprint: 'Sprint 3',
+        spEstimate: 30,
+        spDone: 26,
+        velocity: 26,
+        throughput: 8,
+        bugsVolume: 7,
+        deadlineAccuracy: 0.82,
+      },
+      {
+        date: '2026-03-28',
+        sprint: 'Sprint 4',
+        spEstimate: 36,
+        spDone: 34,
+        velocity: 34,
+        throughput: 11,
+        bugsVolume: 5,
+        deadlineAccuracy: 0.92,
+      },
+    ]
+  ));
+
+  const opsChartData = useMemo(() => {
+    return (opsRows || []).map((r: any) => ({
+      name: r.sprint,
+      date: r.date,
+      Velocity: Number(r.velocity) || 0,
+      'SP Done': Number(r.spDone) || 0,
+      'SP Estimate': Number(r.spEstimate) || 0,
+    }));
+  }, [opsRows]);
+
+  const avgBugsPerSprint = useMemo(() => {
+    const rows = (opsRows || []).filter((r: any) => r?.bugsVolume != null && !isNaN(Number(r.bugsVolume)));
+    if (rows.length === 0) return null;
+    return rows.reduce((acc: number, r: any) => acc + Number(r.bugsVolume), 0) / rows.length;
+  }, [opsRows]);
+
+  const avgDeadlineAccuracy = useMemo(() => {
+    const rows = (opsRows || []).filter((r: any) => r?.deadlineAccuracy != null && !isNaN(Number(r.deadlineAccuracy)));
+    if (rows.length === 0) return null;
+    return rows.reduce((acc: number, r: any) => acc + Number(r.deadlineAccuracy), 0) / rows.length;
+  }, [opsRows]);
 
   const parsePtBrNumber = (raw: string) => {
     const s = String(raw || '').trim();
@@ -338,6 +405,14 @@ export function Dashboard() {
         >
           Indicadores do Planejamento (PE)
         </button>
+        <button
+          onClick={() => setActiveTab('ops')}
+          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+            activeTab === 'ops' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+          }`}
+        >
+          Indicadores Operacionais
+        </button>
       </div>
 
       {activeTab === 'roi' && (
@@ -445,6 +520,100 @@ export function Dashboard() {
                 </div>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'ops' && (
+        <>
+          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Indicadores Operacionais</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Mock de indicadores por sprint (editável) para posterior integração com backend.</div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-[14px]">
+            <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] lg:col-span-2">
+              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-4">Evolução por Sprint</div>
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-[360px]">
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={opsChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} width={42} />
+                      <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                      <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-dim)' }} />
+                      <Line type="monotone" dataKey="Velocity" stroke="var(--blue)" strokeWidth={2} dot={{ fill: 'var(--blue)', r: 3 }} />
+                      <Line type="monotone" dataKey="SP Done" stroke="var(--green)" strokeWidth={2} dot={{ fill: 'var(--green)', r: 3 }} />
+                      <Line type="monotone" dataKey="SP Estimate" stroke="var(--yellow)" strokeWidth={2} dot={{ fill: 'var(--yellow)', r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-[14px]">
+              <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2">Média de novos bugs / sprint</div>
+                <div className="text-[22px] font-extrabold leading-none" style={{ color: 'var(--red)' }}>
+                  {avgBugsPerSprint == null ? '—' : avgBugsPerSprint.toFixed(1).replace('.', ',')}
+                </div>
+                <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Volume médio de bugs reportados por sprint.</div>
+              </div>
+
+              <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-2">Média de assertividade de prazos</div>
+                <div className="text-[22px] font-extrabold leading-none" style={{ color: 'var(--green)' }}>
+                  {avgDeadlineAccuracy == null ? '—' : `${(avgDeadlineAccuracy * 100).toFixed(1).replace('.', ',')}%`}
+                </div>
+                <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Percentual médio de assertividade de prazos por sprint.</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-[14px]">
+            {opsRows.map((r: any, idx: number) => (
+              <div key={`${r.sprint}-${idx}`} className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">{r.sprint}</div>
+                    <div className="text-[12px] text-[var(--text-dim)] mt-1">Data: {r.date}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Data', key: 'date', type: 'date' },
+                    { label: 'Sprint', key: 'sprint', type: 'text' },
+                    { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
+                    { label: 'SP Done', key: 'spDone', type: 'number' },
+                    { label: 'Velocity', key: 'velocity', type: 'number' },
+                    { label: 'Throuput', key: 'throughput', type: 'number' },
+                    { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
+                    { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
+                  ].map((f) => (
+                    <div key={f.key} className="space-y-1.5">
+                      <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
+                      <input
+                        type={f.type}
+                        value={r[f.key] ?? ''}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setOpsRows((prev: any[]) => {
+                            const next = [...prev];
+                            const current = { ...next[idx] };
+                            current[f.key] = f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw;
+                            next[idx] = current;
+                            return next;
+                          });
+                        }}
+                        className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
