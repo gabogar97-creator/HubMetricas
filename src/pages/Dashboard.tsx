@@ -278,25 +278,39 @@ export function Dashboard() {
   });
 
   const opsChartData = useMemo(() => {
-    return (opsRowsSorted || []).slice().reverse().map((r: any) => ({
-      name: r.sprint,
-      date: r.date,
-      Velocity: Number(r.velocity) || 0,
-      'SP Done': Number(r.spDone) || 0,
-      'SP Estimate': Number(r.spEstimate) || 0,
-    }));
+    return (opsRowsSorted || [])
+      .slice()
+      .reverse()
+      .map((r: any) => ({
+        name: r.sprint,
+        date: r.date,
+        Velocity: Number((r as any).velocity) || 0,
+        'SP Done': Number((r as any).sp_done ?? (r as any).spDone) || 0,
+        'SP Estimate': Number((r as any).sp_estimate ?? (r as any).spEstimate) || 0,
+        Throughput: Number((r as any).throughput) || 0,
+      }));
   }, [opsRowsSorted]);
 
   const avgBugsPerSprint = useMemo(() => {
-    const rows = (opsRows || []).filter((r: any) => r?.bugsVolume != null && !isNaN(Number(r.bugsVolume)));
+    const rows = (opsRows || []).filter((r: any) => (r as any)?.bugs_volume != null || (r as any)?.bugsVolume != null);
     if (rows.length === 0) return null;
-    return rows.reduce((acc: number, r: any) => acc + Number(r.bugsVolume), 0) / rows.length;
+    const total = rows.reduce((acc: number, r: any) => {
+      const v = (r as any).bugs_volume ?? (r as any).bugsVolume;
+      const n = v == null ? 0 : Number(v);
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+    return total / rows.length;
   }, [opsRows]);
 
   const avgDeadlineAccuracy = useMemo(() => {
-    const rows = (opsRows || []).filter((r: any) => r?.deadlineAccuracy != null && !isNaN(Number(r.deadlineAccuracy)));
+    const rows = (opsRows || []).filter((r: any) => {
+      const v = (r as any).deadline_accuracy ?? (r as any).deadlineAccuracy;
+      return v != null && !isNaN(Number(v));
+    });
     if (rows.length === 0) return null;
-    return rows.reduce((acc: number, r: any) => acc + Number(r.deadlineAccuracy), 0) / rows.length;
+    return (
+      rows.reduce((acc: number, r: any) => acc + Number((r as any).deadline_accuracy ?? (r as any).deadlineAccuracy), 0) / rows.length
+    );
   }, [opsRows]);
 
   const parsePtBrNumber = (raw: string) => {
@@ -770,6 +784,7 @@ export function Dashboard() {
                       <Line type="monotone" dataKey="Velocity" stroke="var(--blue)" strokeWidth={2} dot={{ fill: 'var(--blue)', r: 3 }} />
                       <Line type="monotone" dataKey="SP Done" stroke="var(--green)" strokeWidth={2} dot={{ fill: 'var(--green)', r: 3 }} />
                       <Line type="monotone" dataKey="SP Estimate" stroke="var(--yellow)" strokeWidth={2} dot={{ fill: 'var(--yellow)', r: 3 }} />
+                      <Line type="monotone" dataKey="Throughput" stroke="var(--accent)" strokeWidth={2} dot={{ fill: 'var(--accent)', r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
