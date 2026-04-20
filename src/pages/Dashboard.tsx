@@ -46,6 +46,9 @@ export function Dashboard() {
   const [opsJiraSprintsError, setOpsJiraSprintsError] = useState<string>('');
   const [opsJiraSprints, setOpsJiraSprints] = useState<any[]>([]);
   const [opsJiraMetricsLoading, setOpsJiraMetricsLoading] = useState(false);
+  const [opsNotEstimatedOpen, setOpsNotEstimatedOpen] = useState(false);
+  const [opsNotEstimatedList, setOpsNotEstimatedList] = useState<any[]>([]);
+  const [opsNotEstimatedCount, setOpsNotEstimatedCount] = useState<number | null>(null);
 
   const [opsRows, setOpsRows] = useState<any[]>([]);
 
@@ -94,10 +97,11 @@ export function Dashboard() {
     try {
       setOpsJiraMetricsLoading(true);
       console.log('[ops] loading Jira metrics for sprint', { sprintId });
-      const [bugs, throughput, spDone] = await Promise.all([
+      const [bugs, throughput, spDone, spEstimate] = await Promise.all([
         invokeJiraOps({ action: 'bugs', sprintId }),
         invokeJiraOps({ action: 'throughput', sprintId }),
         invokeJiraOps({ action: 'spDone', sprintId }),
+        invokeJiraOps({ action: 'spEstimate', sprintId }),
       ]);
 
       console.log('[ops] Jira metrics response', {
@@ -105,12 +109,24 @@ export function Dashboard() {
         bugsTotal: (bugs as any)?.total,
         throughputTotal: (throughput as any)?.total,
         spDone: (spDone as any)?.sum,
+        spEstimate: (spEstimate as any)?.sum,
+        notEstimatedCount: (spEstimate as any)?.notEstimatedCount,
       });
+
+      setOpsNotEstimatedCount(
+        (spEstimate as any)?.notEstimatedCount == null || Number.isNaN(Number((spEstimate as any)?.notEstimatedCount))
+          ? null
+          : Number((spEstimate as any)?.notEstimatedCount),
+      );
+      setOpsNotEstimatedList(Array.isArray((spEstimate as any)?.notEstimatedIssues) ? (spEstimate as any).notEstimatedIssues : []);
+
       setNewOpsDraft((prev: any) => ({
         ...(prev || {}),
         bugsVolume: Number(bugs?.total) || 0,
         throughput: Number(throughput?.total) || 0,
         spDone: (spDone as any)?.sum == null || Number.isNaN(Number((spDone as any)?.sum)) ? '' : Number((spDone as any)?.sum),
+        spEstimate:
+          (spEstimate as any)?.sum == null || Number.isNaN(Number((spEstimate as any)?.sum)) ? '' : Number((spEstimate as any)?.sum),
       }));
     } catch (e) {
       console.error('Failed to load Jira sprint metrics:', e);
@@ -734,6 +750,23 @@ export function Dashboard() {
                       </div>
                     ))}
                     <div className="space-y-1.5">
+                      <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Total não estimado</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpsNotEstimatedOpen(true);
+                        }}
+                        className="w-full text-left bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans hover:border-[var(--accent)] outline-none transition-colors"
+                        disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
+                      >
+                        {opsNotEstimatedCount == null ? '—' : String(opsNotEstimatedCount)}
+                      </button>
+                      <div className="text-[11px] text-[var(--text-dim)]">
+                        Itens sem estimativa (campo Jira `customfield_10016`).
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
                       <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Velocity</label>
                       <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text-dim)] px-3 py-2.5 rounded-md text-[13px] font-sans">
                         Definida no backend
@@ -1157,6 +1190,62 @@ export function Dashboard() {
                   onClick={handleSaveNsmValue}
                 >
                   {isSavingNsm ? 'Salvando…' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {opsNotEstimatedOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <div>
+                <h3 className="font-semibold text-[var(--text)]">Itens sem estimativa</h3>
+                <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Lista de itens com `customfield_10016` nulo na sprint.</div>
+              </div>
+              <button
+                onClick={() => setOpsNotEstimatedOpen(false)}
+                className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <div className="max-h-[420px] overflow-y-auto">
+                <table className="w-full text-[12px] text-left">
+                  <thead className="text-[var(--text-dim)] sticky top-0 bg-[var(--bg3)]">
+                    <tr>
+                      <th className="py-2 px-2 font-medium">Key</th>
+                      <th className="py-2 px-2 font-medium">Summary</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {(opsNotEstimatedList || []).map((it: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="py-2 px-2 font-mono text-[var(--text)]">{String(it?.key || '—')}</td>
+                        <td className="py-2 px-2 text-[var(--text-mid)]">{String(it?.summary || '—')}</td>
+                      </tr>
+                    ))}
+                    {(opsNotEstimatedList || []).length === 0 && (
+                      <tr>
+                        <td colSpan={2} className="py-6 text-center text-[var(--text-dim)]">
+                          Nenhum item sem estimativa.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  onClick={() => setOpsNotEstimatedOpen(false)}
+                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                >
+                  Fechar
                 </button>
               </div>
             </div>
