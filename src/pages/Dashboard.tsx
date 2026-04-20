@@ -648,6 +648,33 @@ export function Dashboard() {
                 </div>
                 <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Percentual médio de assertividade de prazos por sprint.</div>
               </div>
+
+              {isCreatingOps && (
+                <div
+                  className={`glass-card rounded-xl p-4 sm:p-[18px_20px] border transition-colors ${
+                    selectedOpsId === 'new' ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)] ring-2 ring-[rgba(56,189,248,0.35)]' : 'border-transparent'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 text-left">
+                      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Nova Sprint</div>
+                      <div className="text-[12px] text-[var(--text-dim)] mt-1">Selecione a sprint e preencha os indicadores.</div>
+                    </div>
+                    <div className="shrink-0 text-xs font-semibold text-[var(--text2)] bg-[var(--bg4)] px-3 py-2 rounded-md">Cadastro</div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Data', key: 'date', type: 'date' },
+                      { label: 'Sprint', key: 'sprint', type: 'text' },
+                      { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
+                      { label: 'SP Done', key: 'spDone', type: 'number' },
+                      { label: 'Throuput', key: 'throughput', type: 'number' },
+                      { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
+                      { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
+                    ].map((f: any) => (
+                      <div key={f.key} className="space-y-1.5">
+                        <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
                         {f.key === 'sprint' ? (
                           <>
                             <select
@@ -775,7 +802,7 @@ export function Dashboard() {
                       </button>
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
 
