@@ -93,10 +93,17 @@ export function Dashboard() {
   const loadOpsJiraMetricsForSprint = async (sprintId: number) => {
     try {
       setOpsJiraMetricsLoading(true);
+      console.log('[ops] loading Jira metrics for sprint', { sprintId });
       const [bugs, throughput] = await Promise.all([
         invokeJiraOps({ action: 'bugs', sprintId }),
         invokeJiraOps({ action: 'throughput', sprintId }),
       ]);
+
+      console.log('[ops] Jira metrics response', {
+        sprintId,
+        bugsTotal: (bugs as any)?.total,
+        throughputTotal: (throughput as any)?.total,
+      });
       setNewOpsDraft((prev: any) => ({
         ...(prev || {}),
         bugsVolume: Number(bugs?.total) || 0,

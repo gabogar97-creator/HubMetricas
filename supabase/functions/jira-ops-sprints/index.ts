@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
 
     if (action === "listSprints") {
       const url = `${JIRA_BASE_URL}/rest/agile/1.0/board/${BOARD_ID}/sprint`;
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, url }));
       const res = await fetchJira(url);
       if (!res.ok) {
         return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
@@ -110,6 +111,8 @@ Deno.serve(async (req) => {
       return jsonResponse(400, { error: "Missing or invalid sprintId.", meta: { credSource } });
     }
 
+    console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId }));
+
     if (action === "bugs") {
       const jql = `project = IA AND type = Bug AND sprint = ${sprintId} ORDER BY created DESC`;
       const fields = [
@@ -130,12 +133,14 @@ Deno.serve(async (req) => {
       ].join(",");
 
       const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, jql, url }));
       const res = await fetchJira(url);
       if (!res.ok) {
         return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
       }
 
       const total = Number((res.json as any)?.total) || 0;
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, total }));
       return jsonResponse(200, { total, meta: { credSource } });
     }
 
@@ -159,12 +164,14 @@ Deno.serve(async (req) => {
       ].join(",");
 
       const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, jql, url }));
       const res = await fetchJira(url);
       if (!res.ok) {
         return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
       }
 
       const total = Number((res.json as any)?.total) || 0;
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, total }));
       return jsonResponse(200, { total, meta: { credSource } });
     }
 
