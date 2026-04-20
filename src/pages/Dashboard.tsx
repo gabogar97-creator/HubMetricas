@@ -47,54 +47,7 @@ export function Dashboard() {
   const [opsJiraSprints, setOpsJiraSprints] = useState<any[]>([]);
   const [opsJiraMetricsLoading, setOpsJiraMetricsLoading] = useState(false);
 
-  const [opsRows, setOpsRows] = useState(() => (
-    [
-      {
-        id: 'ops-2026-02-14',
-        date: '2026-02-14',
-        sprint: 'Sprint 1',
-        spEstimate: 32,
-        spDone: 28,
-        velocity: 28,
-        throughput: 9,
-        bugsVolume: 6,
-        deadlineAccuracy: 0.86,
-      },
-      {
-        id: 'ops-2026-02-28',
-        date: '2026-02-28',
-        sprint: 'Sprint 2',
-        spEstimate: 34,
-        spDone: 31,
-        velocity: 31,
-        throughput: 10,
-        bugsVolume: 4,
-        deadlineAccuracy: 0.9,
-      },
-      {
-        id: 'ops-2026-03-14',
-        date: '2026-03-14',
-        sprint: 'Sprint 3',
-        spEstimate: 30,
-        spDone: 26,
-        velocity: 26,
-        throughput: 8,
-        bugsVolume: 7,
-        deadlineAccuracy: 0.82,
-      },
-      {
-        id: 'ops-2026-03-28',
-        date: '2026-03-28',
-        sprint: 'Sprint 4',
-        spEstimate: 36,
-        spDone: 34,
-        velocity: 34,
-        throughput: 11,
-        bugsVolume: 5,
-        deadlineAccuracy: 0.92,
-      },
-    ]
-  ));
+  const [opsRows, setOpsRows] = useState<any[]>([]);
 
   const [expandedOpsIds, setExpandedOpsIds] = useState<string[]>([]);
   const [selectedOpsId, setSelectedOpsId] = useState<string>('');
@@ -176,14 +129,13 @@ export function Dashboard() {
     setOpsRows((prev: any[]) => prev.map((r: any) => (String(r.id) === String(id) ? { ...r, ...patch } : r)));
   };
 
-  const mockFetchSprintData = () => {
-    const spEstimate = 28 + Math.round(Math.random() * 12);
-    const spDone = Math.max(0, spEstimate - Math.round(Math.random() * 6));
-    const throughput = 7 + Math.round(Math.random() * 6);
-    const bugsVolume = 3 + Math.round(Math.random() * 6);
-    const deadlineAccuracy = Math.min(1, Math.max(0.6, 0.75 + Math.random() * 0.2));
-    return { spEstimate, spDone, throughput, bugsVolume, deadlineAccuracy };
-  };
+  const mockFetchSprintData = () => ({
+    spEstimate: null,
+    spDone: null,
+    throughput: null,
+    bugsVolume: null,
+    deadlineAccuracy: null,
+  });
 
   const opsChartData = useMemo(() => {
     return (opsRowsSorted || []).slice().reverse().map((r: any) => ({
