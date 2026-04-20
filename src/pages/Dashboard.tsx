@@ -49,6 +49,10 @@ export function Dashboard() {
   const [opsNotEstimatedOpen, setOpsNotEstimatedOpen] = useState(false);
   const [opsNotEstimatedList, setOpsNotEstimatedList] = useState<any[]>([]);
   const [opsNotEstimatedCount, setOpsNotEstimatedCount] = useState<number | null>(null);
+  const [opsCreatingOpen, setOpsCreatingOpen] = useState(false);
+  const [opsCreatingMetricsLoaded, setOpsCreatingMetricsLoaded] = useState(false);
+  const [opsDbLoading, setOpsDbLoading] = useState(false);
+  const [opsDbError, setOpsDbError] = useState<string>('');
 
   const [opsRows, setOpsRows] = useState<any[]>([]);
 
@@ -56,7 +60,6 @@ export function Dashboard() {
   const [selectedOpsId, setSelectedOpsId] = useState<string>('');
   const [editingOpsId, setEditingOpsId] = useState<string>('');
   const [opsDraftById, setOpsDraftById] = useState<Record<string, any>>({});
-  const [isCreatingOps, setIsCreatingOps] = useState(false);
   const [newOpsDraft, setNewOpsDraft] = useState<any>({
     date: new Date().toISOString().split('T')[0],
     sprint: '',
@@ -93,9 +96,83 @@ export function Dashboard() {
     }
   };
 
+  const loadOpsRowsFromDb = async () => {
+    try {
+      setOpsDbLoading(true);
+      setOpsDbError('');
+      const { data, error } = await supabase
+        .from('ops_sprints')
+        .select('*')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setOpsRows(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      console.error('Failed to load ops sprints from DB:', e);
+      setOpsDbError(e?.message || 'Falha ao carregar sprints do banco.');
+    } finally {
+      setOpsDbLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'ops') return;
+    loadOpsRowsFromDb();
+  }, [activeTab]);
+
+  const insertOpsSprint = async (payload: any) => {
+    const { data, error } = await supabase
+      .from('ops_sprints')
+      .insert([
+        {
+          sprint_id: payload?.sprintId ? Number(payload.sprintId) : null,
+          sprint: payload?.sprint || null,
+          date: payload?.date || null,
+          sp_estimate: payload?.spEstimate === '' ? null : payload?.spEstimate,
+          sp_done: payload?.spDone === '' ? null : payload?.spDone,
+          throughput: payload?.throughput === '' ? null : payload?.throughput,
+          bugs_volume: payload?.bugsVolume === '' ? null : payload?.bugsVolume,
+          deadline_accuracy: payload?.deadlineAccuracy === '' ? null : payload?.deadlineAccuracy,
+          not_estimated_count: opsNotEstimatedCount == null ? null : Number(opsNotEstimatedCount),
+        },
+      ])
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data;
+  };
+
+  const updateOpsSprint = async (id: string, patch: any) => {
+    const { data, error } = await supabase
+      .from('ops_sprints')
+      .update({
+        sprint_id: patch?.sprintId ? Number(patch.sprintId) : null,
+        sprint: patch?.sprint || null,
+        date: patch?.date || null,
+        sp_estimate: patch?.spEstimate === '' ? null : patch?.spEstimate,
+        sp_done: patch?.spDone === '' ? null : patch?.spDone,
+        throughput: patch?.throughput === '' ? null : patch?.throughput,
+        bugs_volume: patch?.bugsVolume === '' ? null : patch?.bugsVolume,
+        deadline_accuracy: patch?.deadlineAccuracy === '' ? null : patch?.deadlineAccuracy,
+        not_estimated_count: patch?.notEstimatedCount == null ? null : Number(patch.notEstimatedCount),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data;
+  };
+
+  const deleteOpsSprint = async (id: string) => {
+    const { error } = await supabase.from('ops_sprints').delete().eq('id', id);
+    if (error) throw error;
+  };
+
   const loadOpsJiraMetricsForSprint = async (sprintId: number) => {
     try {
       setOpsJiraMetricsLoading(true);
+      setOpsCreatingMetricsLoaded(false);
       console.log('[ops] loading Jira metrics for sprint', { sprintId });
       const [bugs, throughput, spDone, spEstimate] = await Promise.all([
         invokeJiraOps({ action: 'bugs', sprintId }),
@@ -128,6 +205,8 @@ export function Dashboard() {
         spEstimate:
           (spEstimate as any)?.sum == null || Number.isNaN(Number((spEstimate as any)?.sum)) ? '' : Number((spEstimate as any)?.sum),
       }));
+
+      setOpsCreatingMetricsLoaded(true);
     } catch (e) {
       console.error('Failed to load Jira sprint metrics:', e);
     } finally {
@@ -599,6 +678,139 @@ export function Dashboard() {
                 </div>
               </div>
             )}
+
+      {opsCreatingOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-[920px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <div>
+                <h3 className="font-semibold text-[var(--text)]">Nova Sprint</h3>
+                <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Selecione a sprint para carregar os dados.</div>
+              </div>
+              <button
+                onClick={() => {
+                  setOpsCreatingOpen(false);
+                  setEditingOpsId('');
+                }}
+                className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Sprint</label>
+                <select
+                  value={String(newOpsDraft?.sprintId ?? '')}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    const selected = (opsJiraSprints || []).find((s: any) => String(s?.id) === String(nextId));
+                    setNewOpsDraft((prev: any) => ({
+                      ...(prev || {}),
+                      sprintId: nextId,
+                      sprint: selected?.name ? String(selected.name) : '',
+                    }));
+                    setOpsCreatingMetricsLoaded(false);
+                    const idNum = Number(nextId);
+                    if (!Number.isNaN(idNum) && idNum > 0) {
+                      loadOpsJiraMetricsForSprint(idNum);
+                    }
+                  }}
+                  className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                  disabled={opsJiraSprintsLoading || opsJiraMetricsLoading}
+                >
+                  <option value="">{opsJiraSprintsLoading ? 'Carregando…' : 'Selecione uma sprint…'}</option>
+                  {(opsJiraSprints || []).map((s: any) => (
+                    <option key={String(s?.id)} value={String(s?.id)}>
+                      {String(s?.name || '')} | {String(s?.state || '')}
+                    </option>
+                  ))}
+                </select>
+                {opsJiraSprintsError && <div className="text-[12px] text-[var(--red)] mt-2">{opsJiraSprintsError}</div>}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Data', key: 'date', type: 'date' },
+                  { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
+                  { label: 'SP Done', key: 'spDone', type: 'number' },
+                  { label: 'Throuput', key: 'throughput', type: 'number' },
+                  { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
+                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
+                ].map((f: any) => (
+                  <div key={f.key} className="space-y-1.5">
+                    <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
+                    <input
+                      type={f.type}
+                      value={newOpsDraft?.[f.key] ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setNewOpsDraft((prev: any) => ({
+                          ...(prev || {}),
+                          [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                        }));
+                      }}
+                      className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                      disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded}
+                    />
+                  </div>
+                ))}
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Total não estimado</label>
+                  <button
+                    type="button"
+                    onClick={() => setOpsNotEstimatedOpen(true)}
+                    className="w-full text-left bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans hover:border-[var(--accent)] outline-none transition-colors"
+                    disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
+                  >
+                    {opsNotEstimatedCount == null ? '—' : String(opsNotEstimatedCount)}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setOpsCreatingOpen(false);
+                    setEditingOpsId('');
+                  }}
+                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !newOpsDraft?.sprintId}
+                  className={`px-4 py-2 rounded-md text-xs font-semibold text-white transition-opacity ${
+                    opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !newOpsDraft?.sprintId
+                      ? 'bg-[var(--accent)] opacity-60 cursor-not-allowed'
+                      : 'bg-[var(--accent)] hover:opacity-90'
+                  }`}
+                  onClick={async () => {
+                    try {
+                      setOpsDbLoading(true);
+                      const created = await insertOpsSprint(newOpsDraft);
+                      setOpsRows((prev: any[]) => [created, ...(prev || [])]);
+                      setOpsCreatingOpen(false);
+                      setExpandedOpsIds((prev) => (prev.includes(String(created.id)) ? prev : [String(created.id), ...prev]));
+                      setSelectedOpsId(String(created.id));
+                      setEditingOpsId('');
+                    } catch (e: any) {
+                      console.error('Failed to create ops sprint:', e);
+                      setOpsDbError(e?.message || 'Falha ao salvar a sprint.');
+                    } finally {
+                      setOpsDbLoading(false);
+                    }
+                  }}
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
           </div>
         </>
       )}
@@ -609,12 +821,11 @@ export function Dashboard() {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Indicadores Operacionais</div>
-                <div className="text-[12px] text-[var(--text-dim)] mt-1">Mock de indicadores por sprint (editável) para posterior integração com backend.</div>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setIsCreatingOps(true);
+                  setOpsCreatingOpen(true);
                   setNewOpsDraft({
                     date: new Date().toISOString().split('T')[0],
                     sprint: '',
@@ -625,9 +836,11 @@ export function Dashboard() {
                     bugsVolume: '',
                     deadlineAccuracy: '',
                   });
-                  setExpandedOpsIds((prev) => (prev.includes('new') ? prev : ['new', ...prev]));
-                  setSelectedOpsId('new');
-                  setEditingOpsId('');
+                  setOpsNotEstimatedCount(null);
+                  setOpsNotEstimatedList([]);
+                  setOpsCreatingMetricsLoaded(false);
+                  setSelectedOpsId('');
+                  setEditingOpsId('new');
                   loadOpsJiraSprints();
                 }}
                 className="w-full sm:w-auto px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
@@ -675,278 +888,158 @@ export function Dashboard() {
                 <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Percentual médio de assertividade de prazos por sprint.</div>
               </div>
 
-              {isCreatingOps && (
-                <div
-                  className={`glass-card rounded-xl p-4 sm:p-[18px_20px] border transition-colors ${
-                    selectedOpsId === 'new' ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)] ring-2 ring-[rgba(56,189,248,0.35)]' : 'border-transparent'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 text-left">
-                      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Nova Sprint</div>
-                      <div className="text-[12px] text-[var(--text-dim)] mt-1">Selecione a sprint e preencha os indicadores.</div>
-                    </div>
-                    <div className="shrink-0 text-xs font-semibold text-[var(--text2)] bg-[var(--bg4)] px-3 py-2 rounded-md">Cadastro</div>
-                  </div>
+            </div>
 
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[
-                      { label: 'Data', key: 'date', type: 'date' },
-                      { label: 'Sprint', key: 'sprint', type: 'text' },
-                      { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
-                      { label: 'SP Done', key: 'spDone', type: 'number' },
-                      { label: 'Throuput', key: 'throughput', type: 'number' },
-                      { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
-                      { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
-                    ].map((f: any) => (
-                      <div key={f.key} className="space-y-1.5">
-                        <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
-                        {f.key === 'sprint' ? (
-                          <>
-                            <select
-                              value={String(newOpsDraft?.sprintId ?? '')}
-                              onChange={(e) => {
-                                const nextId = e.target.value;
-                                const selected = (opsJiraSprints || []).find((s: any) => String(s?.id) === String(nextId));
-                                setNewOpsDraft((prev: any) => ({
-                                  ...(prev || {}),
-                                  sprintId: nextId,
-                                  sprint: selected?.name ? String(selected.name) : '',
-                                }));
-                                const idNum = Number(nextId);
-                                if (!Number.isNaN(idNum) && idNum > 0) {
-                                  loadOpsJiraMetricsForSprint(idNum);
+            <div className="lg:col-span-3">
+              {opsDbError && <div className="text-[12px] text-[var(--red)] mb-3">{opsDbError}</div>}
+              {opsDbLoading ? (
+                <div className="glass-card rounded-xl p-8 text-[13px] text-[var(--text-dim)] text-center">Carregando sprints…</div>
+              ) : (
+                <div className="flex flex-col gap-[14px]">
+                  {opsRowsSorted.map((r: any) => {
+                    const isExpanded = expandedOpsIds.includes(String(r.id));
+                    const isSelected = selectedOpsId === String(r.id);
+                    const isEditing = editingOpsId === String(r.id);
+                    return (
+                      <div
+                        key={String(r.id)}
+                        className={`glass-card rounded-xl p-4 sm:p-[18px_20px] border transition-colors ${
+                          isSelected
+                            ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)] ring-2 ring-[rgba(56,189,248,0.35)]'
+                            : 'border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOpsId(String(r.id));
+                              setExpandedOpsIds((prev) =>
+                                prev.includes(String(r.id)) ? prev.filter((x) => x !== String(r.id)) : [String(r.id), ...prev],
+                              );
+                            }}
+                            className="min-w-0 text-left flex-1"
+                          >
+                            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">{r.sprint}</div>
+                            <div className="text-[12px] text-[var(--text-dim)] mt-1">
+                              {r.date} · SP {r.sp_done ?? r.spDone ?? '—'}/{r.sp_estimate ?? r.spEstimate ?? '—'} · Bugs {r.bugs_volume ?? r.bugsVolume ?? '—'} · Throughput {r.throughput ?? '—'}
+                            </div>
+                          </button>
+                          <div className="shrink-0 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpsDraftById((prev) => ({ ...(prev || {}), [String(r.id)]: { ...r } }));
+                                setSelectedOpsId(String(r.id));
+                                setEditingOpsId(String(r.id));
+                                setExpandedOpsIds((prev) => (prev.includes(String(r.id)) ? prev : [String(r.id), ...prev]));
+                              }}
+                              className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!confirm('Excluir esta sprint?')) return;
+                                try {
+                                  await deleteOpsSprint(String(r.id));
+                                  setOpsRows((prev: any[]) => (prev || []).filter((x: any) => String(x.id) !== String(r.id)));
+                                  setExpandedOpsIds((prev) => prev.filter((x) => x !== String(r.id)));
+                                  if (selectedOpsId === String(r.id)) setSelectedOpsId('');
+                                } catch (e) {
+                                  console.error('Failed to delete ops sprint:', e);
                                 }
                               }}
-                              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                              disabled={opsJiraSprintsLoading || opsJiraMetricsLoading}
+                              className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--red)] hover:text-[var(--text)] transition-colors"
                             >
-                              <option value="">{opsJiraSprintsLoading ? 'Carregando…' : 'Selecione uma sprint…'}</option>
-                              {(opsJiraSprints || []).map((s: any) => (
-                                <option key={String(s?.id)} value={String(s?.id)}>
-                                  {String(s?.name || '')} | {String(s?.state || '')}
-                                </option>
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <>
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              {[
+                                { label: 'Data', key: 'date', type: 'date', dbKey: 'date' },
+                                { label: 'Sprint', key: 'sprint', type: 'text', dbKey: 'sprint' },
+                                { label: 'SP Estimate', key: 'spEstimate', type: 'number', dbKey: 'sp_estimate' },
+                                { label: 'SP Done', key: 'spDone', type: 'number', dbKey: 'sp_done' },
+                                { label: 'Throuput', key: 'throughput', type: 'number', dbKey: 'throughput' },
+                                { label: 'Volume Bugs', key: 'bugsVolume', type: 'number', dbKey: 'bugs_volume' },
+                                { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', dbKey: 'deadline_accuracy' },
+                              ].map((f) => (
+                                <div key={f.key} className="space-y-1.5">
+                                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
+                                  <input
+                                    type={f.type}
+                                    value={(r as any)[f.dbKey] ?? (r as any)[f.key] ?? ''}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      updateOpsRow(String(r.id), {
+                                        [f.dbKey]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                                      });
+                                    }}
+                                    className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                                    disabled={!isEditing}
+                                  />
+                                </div>
                               ))}
-                            </select>
-                            {opsJiraSprintsError && (
-                              <div className="text-[12px] text-[var(--red)] mt-2">{opsJiraSprintsError}</div>
+                            </div>
+
+                            {isEditing && (
+                              <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const updated = await updateOpsSprint(String(r.id), {
+                                        sprintId: (r as any).sprint_id ?? (r as any).sprintId,
+                                        sprint: (r as any).sprint,
+                                        date: (r as any).date,
+                                        spEstimate: (r as any).sp_estimate ?? (r as any).spEstimate,
+                                        spDone: (r as any).sp_done ?? (r as any).spDone,
+                                        throughput: (r as any).throughput,
+                                        bugsVolume: (r as any).bugs_volume ?? (r as any).bugsVolume,
+                                        deadlineAccuracy: (r as any).deadline_accuracy ?? (r as any).deadlineAccuracy,
+                                        notEstimatedCount: (r as any).not_estimated_count ?? (r as any).notEstimatedCount,
+                                      });
+                                      setOpsRows((prev: any[]) => (prev || []).map((x: any) => (String(x.id) === String(r.id) ? updated : x)));
+                                      setEditingOpsId('');
+                                    } catch (e) {
+                                      console.error('Failed to update ops sprint:', e);
+                                    }
+                                  }}
+                                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const snapshot = opsDraftById[String(r.id)];
+                                    if (snapshot) updateOpsRow(String(r.id), snapshot);
+                                    setEditingOpsId('');
+                                  }}
+                                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
                             )}
                           </>
-                        ) : (
-                          <input
-                            type={f.type}
-                            value={newOpsDraft?.[f.key] ?? ''}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              setNewOpsDraft((prev: any) => ({
-                                ...(prev || {}),
-                                [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                              }));
-                            }}
-                            className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                            disabled={editingOpsId !== 'new'}
-                          />
                         )}
                       </div>
-                    ))}
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Total não estimado</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpsNotEstimatedOpen(true);
-                        }}
-                        className="w-full text-left bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans hover:border-[var(--accent)] outline-none transition-colors"
-                        disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
-                      >
-                        {opsNotEstimatedCount == null ? '—' : String(opsNotEstimatedCount)}
-                      </button>
-                      <div className="text-[11px] text-[var(--text-dim)]">
-                        Itens sem estimativa (campo Jira `customfield_10016`).
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Velocity</label>
-                      <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text-dim)] px-3 py-2.5 rounded-md text-[13px] font-sans">
-                        Definida no backend
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedOpsId('new');
-                          setEditingOpsId('new');
-                        }}
-                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                      >
-                        Editar
-                      </button>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const payload = {
-                            id: `ops-${newOpsDraft?.date || Date.now()}`,
-                            date: newOpsDraft?.date,
-                            sprint: newOpsDraft?.sprint,
-                            sprintId: newOpsDraft?.sprintId,
-                            spEstimate: newOpsDraft?.spEstimate === '' ? null : Number(newOpsDraft?.spEstimate),
-                            spDone: newOpsDraft?.spDone === '' ? null : Number(newOpsDraft?.spDone),
-                            velocity: null,
-                            throughput: newOpsDraft?.throughput === '' ? null : Number(newOpsDraft?.throughput),
-                            bugsVolume: newOpsDraft?.bugsVolume === '' ? null : Number(newOpsDraft?.bugsVolume),
-                            deadlineAccuracy: newOpsDraft?.deadlineAccuracy === '' ? null : Number(newOpsDraft?.deadlineAccuracy),
-                          };
-                          setOpsRows((prev: any[]) => [payload, ...(prev || [])]);
-                          setIsCreatingOps(false);
-                          setExpandedOpsIds((prev) => (prev.includes(String(payload.id)) ? prev : [String(payload.id), ...prev.filter((x) => x !== 'new')]));
-                          setSelectedOpsId(String(payload.id));
-                          setEditingOpsId('');
-                        }}
-                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
-                      >
-                        Salvar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsCreatingOps(false);
-                          setEditingOpsId('');
-                          setExpandedOpsIds((prev) => prev.filter((x) => x !== 'new'));
-                          setSelectedOpsId(opsRowsSorted[0]?.id ? String(opsRowsSorted[0].id) : '');
-                        }}
-                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
+                    );
+                  })}
+                  {opsRowsSorted.length === 0 && (
+                    <div className="glass-card rounded-xl p-8 text-[13px] text-[var(--text-dim)] text-center">Nenhuma sprint cadastrada.</div>
+                  )}
                 </div>
               )}
             </div>
 
-            {opsRowsSorted.map((r: any) => {
-              const isExpanded = expandedOpsIds.includes(String(r.id));
-              const isSelected = selectedOpsId === String(r.id);
-              const isEditing = editingOpsId === String(r.id);
-              return (
-                <div
-                  key={String(r.id)}
-                  className={`glass-card rounded-xl p-4 sm:p-[18px_20px] border transition-colors ${
-                    isSelected ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)] ring-2 ring-[rgba(56,189,248,0.35)]' : 'border-transparent'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedOpsId(String(r.id));
-                      setExpandedOpsIds((prev) => (prev.includes(String(r.id)) ? prev.filter((x) => x !== String(r.id)) : [String(r.id), ...prev]));
-                    }}
-                    className="w-full flex items-start justify-between gap-3"
-                  >
-                    <div className="min-w-0 text-left">
-                      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">{r.sprint}</div>
-                      <div className="text-[12px] text-[var(--text-dim)] mt-1">
-                        {r.date} · SP {r.spDone ?? '—'}/{r.spEstimate ?? '—'} · Bugs {r.bugsVolume ?? '—'} · Throughput {r.throughput ?? '—'} · Assertividade {r.deadlineAccuracy != null && !isNaN(Number(r.deadlineAccuracy)) ? `${(Number(r.deadlineAccuracy) * 100).toFixed(0)}%` : '—'}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-xs font-semibold text-[var(--text2)] bg-[var(--bg4)] px-3 py-2 rounded-md">
-                      {isExpanded ? 'Recolher' : 'Expandir'}
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <>
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                          { label: 'Data', key: 'date', type: 'date' },
-                          { label: 'Sprint', key: 'sprint', type: 'text' },
-                          { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
-                          { label: 'SP Done', key: 'spDone', type: 'number' },
-                          { label: 'Throuput', key: 'throughput', type: 'number' },
-                          { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
-                          { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
-                        ].map((f) => (
-                          <div key={f.key} className="space-y-1.5">
-                            <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
-                            <input
-                              type={f.type}
-                              value={r[f.key] ?? ''}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                updateOpsRow(String(r.id), {
-                                  [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                                });
-                              }}
-                              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                              disabled={!isEditing}
-                            />
-                          </div>
-                        ))}
-                        <div className="space-y-1.5">
-                          <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Velocity</label>
-                          <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans">
-                            {r.velocity == null || isNaN(Number(r.velocity)) ? '—' : Number(r.velocity)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpsDraftById((prev) => ({ ...(prev || {}), [String(r.id)]: { ...r } }));
-                              setSelectedOpsId(String(r.id));
-                              setEditingOpsId(String(r.id));
-                            }}
-                            className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                          >
-                            Editar
-                          </button>
-                        </div>
-
-                        <div className="flex gap-2">
-                          {isEditing ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingOpsId('');
-                                }}
-                                className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
-                              >
-                                Salvar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const snapshot = opsDraftById[String(r.id)];
-                                  if (snapshot) updateOpsRow(String(r.id), snapshot);
-                                  setEditingOpsId('');
-                                }}
-                                className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                              >
-                                Cancelar
-                              </button>
-                            </>
-                          ) : (
-                            <div />
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </>
       )}
@@ -1203,7 +1296,6 @@ export function Dashboard() {
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
               <div>
                 <h3 className="font-semibold text-[var(--text)]">Itens sem estimativa</h3>
-                <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Lista de itens com `customfield_10016` nulo na sprint.</div>
               </div>
               <button
                 onClick={() => setOpsNotEstimatedOpen(false)}
