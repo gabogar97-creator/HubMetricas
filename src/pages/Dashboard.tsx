@@ -68,7 +68,10 @@ export function Dashboard() {
     spDone: '',
     throughput: '',
     bugsVolume: '',
+    deadlinesAgreed: '',
+    deadlinesMet: '',
     deadlineAccuracy: '',
+    velocity: '',
   });
 
   const invokeJiraOps = async (payload: any) => {
@@ -115,6 +118,25 @@ export function Dashboard() {
     }
   };
 
+  const computeDefaultVelocity = () => {
+    const rows = Array.isArray(opsRowsSorted) ? opsRowsSorted : [];
+    const last3 = rows
+      .filter((r: any) => r?.velocity != null && !Number.isNaN(Number(r.velocity)))
+      .slice(0, 3)
+      .map((r: any) => Number(r.velocity));
+    if (last3.length === 0) return null;
+    const sum = last3.reduce((a: number, b: number) => a + b, 0);
+    return sum / 3;
+  };
+
+  const computeDeadlineAccuracy = (agreedRaw: any, metRaw: any) => {
+    const agreed = agreedRaw === '' || agreedRaw == null ? null : Number(agreedRaw);
+    const met = metRaw === '' || metRaw == null ? null : Number(metRaw);
+    if (!agreed || Number.isNaN(agreed) || agreed <= 0) return '';
+    if (met == null || Number.isNaN(met) || met < 0) return '';
+    return met / agreed;
+  };
+
   useEffect(() => {
     if (activeTab !== 'ops') return;
     loadOpsRowsFromDb();
@@ -132,7 +154,10 @@ export function Dashboard() {
           sp_done: payload?.spDone === '' ? null : payload?.spDone,
           throughput: payload?.throughput === '' ? null : payload?.throughput,
           bugs_volume: payload?.bugsVolume === '' ? null : payload?.bugsVolume,
+          deadlines_agreed: payload?.deadlinesAgreed === '' ? null : payload?.deadlinesAgreed,
+          deadlines_met: payload?.deadlinesMet === '' ? null : payload?.deadlinesMet,
           deadline_accuracy: payload?.deadlineAccuracy === '' ? null : payload?.deadlineAccuracy,
+          velocity: payload?.velocity === '' ? null : payload?.velocity,
           not_estimated_count: opsNotEstimatedCount == null ? null : Number(opsNotEstimatedCount),
         },
       ])
@@ -153,7 +178,10 @@ export function Dashboard() {
         sp_done: patch?.spDone === '' ? null : patch?.spDone,
         throughput: patch?.throughput === '' ? null : patch?.throughput,
         bugs_volume: patch?.bugsVolume === '' ? null : patch?.bugsVolume,
+        deadlines_agreed: patch?.deadlinesAgreed === '' ? null : patch?.deadlinesAgreed,
+        deadlines_met: patch?.deadlinesMet === '' ? null : patch?.deadlinesMet,
         deadline_accuracy: patch?.deadlineAccuracy === '' ? null : patch?.deadlineAccuracy,
+        velocity: patch?.velocity === '' ? null : patch?.velocity,
         not_estimated_count: patch?.notEstimatedCount == null ? null : Number(patch.notEstimatedCount),
         updated_at: new Date().toISOString(),
       })
@@ -197,14 +225,23 @@ export function Dashboard() {
       );
       setOpsNotEstimatedList(Array.isArray((spEstimate as any)?.notEstimatedIssues) ? (spEstimate as any).notEstimatedIssues : []);
 
-      setNewOpsDraft((prev: any) => ({
-        ...(prev || {}),
-        bugsVolume: Number(bugs?.total) || 0,
-        throughput: Number(throughput?.total) || 0,
-        spDone: (spDone as any)?.sum == null || Number.isNaN(Number((spDone as any)?.sum)) ? '' : Number((spDone as any)?.sum),
-        spEstimate:
-          (spEstimate as any)?.sum == null || Number.isNaN(Number((spEstimate as any)?.sum)) ? '' : Number((spEstimate as any)?.sum),
-      }));
+      const defaultVelocity = computeDefaultVelocity();
+      setNewOpsDraft((prev: any) => {
+        const next = {
+          ...(prev || {}),
+          bugsVolume: Number(bugs?.total) || 0,
+          throughput: Number(throughput?.total) || 0,
+          spDone: (spDone as any)?.sum == null || Number.isNaN(Number((spDone as any)?.sum)) ? '' : Number((spDone as any)?.sum),
+          spEstimate:
+            (spEstimate as any)?.sum == null || Number.isNaN(Number((spEstimate as any)?.sum)) ? '' : Number((spEstimate as any)?.sum),
+        } as any;
+        const computedAccuracy = computeDeadlineAccuracy(next.deadlinesAgreed, next.deadlinesMet);
+        if (computedAccuracy !== '') next.deadlineAccuracy = computedAccuracy;
+        if ((next.velocity === '' || next.velocity == null) && defaultVelocity != null && !Number.isNaN(Number(defaultVelocity))) {
+          next.velocity = Number(defaultVelocity);
+        }
+        return next;
+      });
 
       setOpsCreatingMetricsLoaded(true);
     } catch (e) {
@@ -701,7 +738,10 @@ export function Dashboard() {
                     spDone: '',
                     throughput: '',
                     bugsVolume: '',
+                    deadlinesAgreed: '',
+                    deadlinesMet: '',
                     deadlineAccuracy: '',
+                    velocity: '',
                   });
                   setOpsNotEstimatedCount(null);
                   setOpsNotEstimatedList([]);
@@ -835,7 +875,10 @@ export function Dashboard() {
                                 { label: 'SP Done', key: 'spDone', type: 'number', dbKey: 'sp_done' },
                                 { label: 'Throuput', key: 'throughput', type: 'number', dbKey: 'throughput' },
                                 { label: 'Volume Bugs', key: 'bugsVolume', type: 'number', dbKey: 'bugs_volume' },
-                                { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', dbKey: 'deadline_accuracy' },
+                                { label: 'Quantidade Prazos Combinados', key: 'deadlinesAgreed', type: 'number', dbKey: 'deadlines_agreed' },
+                                { label: 'Quantidade de Prazos Cumpridos', key: 'deadlinesMet', type: 'number', dbKey: 'deadlines_met' },
+                                { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', dbKey: 'deadline_accuracy', readonly: true },
+                                { label: 'Velocity', key: 'velocity', type: 'number', dbKey: 'velocity', isVelocity: true },
                               ].map((f) => (
                                 <div key={f.key} className="space-y-1.5">
                                   <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
@@ -844,12 +887,24 @@ export function Dashboard() {
                                     value={(r as any)[f.dbKey] ?? (r as any)[f.key] ?? ''}
                                     onChange={(e) => {
                                       const raw = e.target.value;
-                                      updateOpsRow(String(r.id), {
-                                        [f.dbKey]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                                      updateOpsRow(String(r.id), (prev: any) => {
+                                        const nextPatch: any = {
+                                          [f.dbKey]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                                        };
+                                        const agreed = f.dbKey === 'deadlines_agreed' ? nextPatch[f.dbKey] : (prev as any)?.deadlines_agreed;
+                                        const met = f.dbKey === 'deadlines_met' ? nextPatch[f.dbKey] : (prev as any)?.deadlines_met;
+                                        if (f.dbKey === 'deadlines_agreed' || f.dbKey === 'deadlines_met') {
+                                          nextPatch.deadline_accuracy = computeDeadlineAccuracy(agreed, met);
+                                        }
+                                        return nextPatch;
                                       });
                                     }}
-                                    className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                                    disabled={!isEditing}
+                                    className={`w-full border text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans outline-none transition-colors ${
+                                      (f as any).isVelocity
+                                        ? 'bg-[rgba(245,158,11,0.12)] border-[rgba(245,158,11,0.35)] focus:border-[rgba(245,158,11,0.6)]'
+                                        : 'bg-[var(--bg4)] border-[var(--border2)] focus:border-[var(--accent)]'
+                                    }`}
+                                    disabled={!isEditing || !!(f as any).readonly}
                                   />
                                 </div>
                               ))}
@@ -869,7 +924,10 @@ export function Dashboard() {
                                         spDone: (r as any).sp_done ?? (r as any).spDone,
                                         throughput: (r as any).throughput,
                                         bugsVolume: (r as any).bugs_volume ?? (r as any).bugsVolume,
+                                        deadlinesAgreed: (r as any).deadlines_agreed ?? (r as any).deadlinesAgreed,
+                                        deadlinesMet: (r as any).deadlines_met ?? (r as any).deadlinesMet,
                                         deadlineAccuracy: (r as any).deadline_accuracy ?? (r as any).deadlineAccuracy,
+                                        velocity: (r as any).velocity,
                                         notEstimatedCount: (r as any).not_estimated_count ?? (r as any).notEstimatedCount,
                                       });
                                       setOpsRows((prev: any[]) => (prev || []).map((x: any) => (String(x.id) === String(r.id) ? updated : x)));
@@ -1158,7 +1216,7 @@ export function Dashboard() {
       )}
 
       {opsNotEstimatedOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-[820px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
               <div>
@@ -1270,7 +1328,9 @@ export function Dashboard() {
                   { label: 'SP Done', key: 'spDone', type: 'number' },
                   { label: 'Throuput', key: 'throughput', type: 'number' },
                   { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
-                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
+                  { label: 'Quantidade Prazos Combinados', key: 'deadlinesAgreed', type: 'number' },
+                  { label: 'Quantidade de Prazos Cumpridos', key: 'deadlinesMet', type: 'number' },
+                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', readonly: true },
                 ].map((f: any) => (
                   <div key={f.key} className="space-y-1.5">
                     <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
@@ -1279,31 +1339,52 @@ export function Dashboard() {
                       value={newOpsDraft?.[f.key] ?? ''}
                       onChange={(e) => {
                         const raw = e.target.value;
-                        setNewOpsDraft((prev: any) => ({
-                          ...(prev || {}),
-                          [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                        }));
+                        setNewOpsDraft((prev: any) => {
+                          const next = {
+                            ...(prev || {}),
+                            [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                          } as any;
+                          if (f.key === 'deadlinesAgreed' || f.key === 'deadlinesMet') {
+                            next.deadlineAccuracy = computeDeadlineAccuracy(next.deadlinesAgreed, next.deadlinesMet);
+                          }
+                          return next;
+                        });
                       }}
-                      className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                      disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded}
+                      className={`w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors ${
+                        f.readonly ? 'opacity-90' : ''
+                      }`}
+                      disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !!f.readonly}
                     />
                   </div>
                 ))}
 
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Total não estimado</label>
-                  <button
-                    type="button"
-                    onClick={() => setOpsNotEstimatedOpen(true)}
-                    className="w-full text-left bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans hover:border-[var(--accent)] outline-none transition-colors"
-                    disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
-                  >
-                    {opsNotEstimatedCount == null ? '—' : String(opsNotEstimatedCount)}
-                  </button>
+                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Velocity</label>
+                  <input
+                    type="number"
+                    value={newOpsDraft?.velocity ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setNewOpsDraft((prev: any) => ({
+                        ...(prev || {}),
+                        velocity: raw === '' ? '' : Number(raw),
+                      }));
+                    }}
+                    className="w-full bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.35)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[rgba(245,158,11,0.6)] outline-none transition-colors"
+                    disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded}
+                  />
                 </div>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpsNotEstimatedOpen(true)}
+                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[rgba(245,158,11,0.18)] text-[var(--yellow)] hover:bg-[rgba(245,158,11,0.24)] transition-colors"
+                  disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
+                >
+                  Total não estimado
+                </button>
                 <button
                   onClick={() => {
                     setOpsCreatingOpen(false);
