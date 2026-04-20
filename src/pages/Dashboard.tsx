@@ -678,139 +678,6 @@ export function Dashboard() {
                 </div>
               </div>
             )}
-
-      {opsCreatingOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-card w-full max-w-[920px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <div>
-                <h3 className="font-semibold text-[var(--text)]">Nova Sprint</h3>
-                <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Selecione a sprint para carregar os dados.</div>
-              </div>
-              <button
-                onClick={() => {
-                  setOpsCreatingOpen(false);
-                  setEditingOpsId('');
-                }}
-                className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Sprint</label>
-                <select
-                  value={String(newOpsDraft?.sprintId ?? '')}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    const selected = (opsJiraSprints || []).find((s: any) => String(s?.id) === String(nextId));
-                    setNewOpsDraft((prev: any) => ({
-                      ...(prev || {}),
-                      sprintId: nextId,
-                      sprint: selected?.name ? String(selected.name) : '',
-                    }));
-                    setOpsCreatingMetricsLoaded(false);
-                    const idNum = Number(nextId);
-                    if (!Number.isNaN(idNum) && idNum > 0) {
-                      loadOpsJiraMetricsForSprint(idNum);
-                    }
-                  }}
-                  className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                  disabled={opsJiraSprintsLoading || opsJiraMetricsLoading}
-                >
-                  <option value="">{opsJiraSprintsLoading ? 'Carregando…' : 'Selecione uma sprint…'}</option>
-                  {(opsJiraSprints || []).map((s: any) => (
-                    <option key={String(s?.id)} value={String(s?.id)}>
-                      {String(s?.name || '')} | {String(s?.state || '')}
-                    </option>
-                  ))}
-                </select>
-                {opsJiraSprintsError && <div className="text-[12px] text-[var(--red)] mt-2">{opsJiraSprintsError}</div>}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { label: 'Data', key: 'date', type: 'date' },
-                  { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
-                  { label: 'SP Done', key: 'spDone', type: 'number' },
-                  { label: 'Throuput', key: 'throughput', type: 'number' },
-                  { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
-                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
-                ].map((f: any) => (
-                  <div key={f.key} className="space-y-1.5">
-                    <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
-                    <input
-                      type={f.type}
-                      value={newOpsDraft?.[f.key] ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setNewOpsDraft((prev: any) => ({
-                          ...(prev || {}),
-                          [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                        }));
-                      }}
-                      className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                      disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded}
-                    />
-                  </div>
-                ))}
-
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Total não estimado</label>
-                  <button
-                    type="button"
-                    onClick={() => setOpsNotEstimatedOpen(true)}
-                    className="w-full text-left bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans hover:border-[var(--accent)] outline-none transition-colors"
-                    disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
-                  >
-                    {opsNotEstimatedCount == null ? '—' : String(opsNotEstimatedCount)}
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setOpsCreatingOpen(false);
-                    setEditingOpsId('');
-                  }}
-                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !newOpsDraft?.sprintId}
-                  className={`px-4 py-2 rounded-md text-xs font-semibold text-white transition-opacity ${
-                    opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !newOpsDraft?.sprintId
-                      ? 'bg-[var(--accent)] opacity-60 cursor-not-allowed'
-                      : 'bg-[var(--accent)] hover:opacity-90'
-                  }`}
-                  onClick={async () => {
-                    try {
-                      setOpsDbLoading(true);
-                      const created = await insertOpsSprint(newOpsDraft);
-                      setOpsRows((prev: any[]) => [created, ...(prev || [])]);
-                      setOpsCreatingOpen(false);
-                      setExpandedOpsIds((prev) => (prev.includes(String(created.id)) ? prev : [String(created.id), ...prev]));
-                      setSelectedOpsId(String(created.id));
-                      setEditingOpsId('');
-                    } catch (e: any) {
-                      console.error('Failed to create ops sprint:', e);
-                      setOpsDbError(e?.message || 'Falha ao salvar a sprint.');
-                    } finally {
-                      setOpsDbLoading(false);
-                    }
-                  }}
-                >
-                  Salvar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
           </div>
         </>
       )}
@@ -1338,6 +1205,139 @@ export function Dashboard() {
                   className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
                 >
                   Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {opsCreatingOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-[920px] overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <div>
+                <h3 className="font-semibold text-[var(--text)]">Nova Sprint</h3>
+                <div className="text-[12px] text-[var(--text-dim)] mt-0.5">Selecione a sprint para carregar os dados.</div>
+              </div>
+              <button
+                onClick={() => {
+                  setOpsCreatingOpen(false);
+                  setEditingOpsId('');
+                }}
+                className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Sprint</label>
+                <select
+                  value={String(newOpsDraft?.sprintId ?? '')}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    const selected = (opsJiraSprints || []).find((s: any) => String(s?.id) === String(nextId));
+                    setNewOpsDraft((prev: any) => ({
+                      ...(prev || {}),
+                      sprintId: nextId,
+                      sprint: selected?.name ? String(selected.name) : '',
+                    }));
+                    setOpsCreatingMetricsLoaded(false);
+                    const idNum = Number(nextId);
+                    if (!Number.isNaN(idNum) && idNum > 0) {
+                      loadOpsJiraMetricsForSprint(idNum);
+                    }
+                  }}
+                  className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                  disabled={opsJiraSprintsLoading || opsJiraMetricsLoading}
+                >
+                  <option value="">{opsJiraSprintsLoading ? 'Carregando…' : 'Selecione uma sprint…'}</option>
+                  {(opsJiraSprints || []).map((s: any) => (
+                    <option key={String(s?.id)} value={String(s?.id)}>
+                      {String(s?.name || '')} | {String(s?.state || '')}
+                    </option>
+                  ))}
+                </select>
+                {opsJiraSprintsError && <div className="text-[12px] text-[var(--red)] mt-2">{opsJiraSprintsError}</div>}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Data', key: 'date', type: 'date' },
+                  { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
+                  { label: 'SP Done', key: 'spDone', type: 'number' },
+                  { label: 'Throuput', key: 'throughput', type: 'number' },
+                  { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
+                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
+                ].map((f: any) => (
+                  <div key={f.key} className="space-y-1.5">
+                    <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
+                    <input
+                      type={f.type}
+                      value={newOpsDraft?.[f.key] ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setNewOpsDraft((prev: any) => ({
+                          ...(prev || {}),
+                          [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                        }));
+                      }}
+                      className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                      disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded}
+                    />
+                  </div>
+                ))}
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Total não estimado</label>
+                  <button
+                    type="button"
+                    onClick={() => setOpsNotEstimatedOpen(true)}
+                    className="w-full text-left bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans hover:border-[var(--accent)] outline-none transition-colors"
+                    disabled={!opsNotEstimatedCount || opsNotEstimatedCount <= 0}
+                  >
+                    {opsNotEstimatedCount == null ? '—' : String(opsNotEstimatedCount)}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setOpsCreatingOpen(false);
+                    setEditingOpsId('');
+                  }}
+                  className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !newOpsDraft?.sprintId}
+                  className={`px-4 py-2 rounded-md text-xs font-semibold text-white transition-opacity ${
+                    opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !newOpsDraft?.sprintId
+                      ? 'bg-[var(--accent)] opacity-60 cursor-not-allowed'
+                      : 'bg-[var(--accent)] hover:opacity-90'
+                  }`}
+                  onClick={async () => {
+                    try {
+                      setOpsDbLoading(true);
+                      const created = await insertOpsSprint(newOpsDraft);
+                      setOpsRows((prev: any[]) => [created, ...(prev || [])]);
+                      setOpsCreatingOpen(false);
+                      setExpandedOpsIds((prev) => (prev.includes(String(created.id)) ? prev : [String(created.id), ...prev]));
+                      setSelectedOpsId(String(created.id));
+                      setEditingOpsId('');
+                    } catch (e: any) {
+                      console.error('Failed to create ops sprint:', e);
+                      setOpsDbError(e?.message || 'Falha ao salvar a sprint.');
+                    } finally {
+                      setOpsDbLoading(false);
+                    }
+                  }}
+                >
+                  Salvar
                 </button>
               </div>
             </div>
