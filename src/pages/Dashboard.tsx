@@ -88,8 +88,10 @@ export function Dashboard() {
     ]
   ));
 
-  const [expandedOpsId, setExpandedOpsId] = useState<string>('');
-  const [opsFetchOnSaveById, setOpsFetchOnSaveById] = useState<Record<string, boolean>>({});
+  const [expandedOpsIds, setExpandedOpsIds] = useState<string[]>([]);
+  const [selectedOpsId, setSelectedOpsId] = useState<string>('');
+  const [editingOpsId, setEditingOpsId] = useState<string>('');
+  const [opsDraftById, setOpsDraftById] = useState<Record<string, any>>({});
   const [isCreatingOps, setIsCreatingOps] = useState(false);
   const [newOpsDraft, setNewOpsDraft] = useState<any>({
     date: new Date().toISOString().split('T')[0],
@@ -110,13 +112,24 @@ export function Dashboard() {
   }, [opsRows]);
 
   useEffect(() => {
-    if (expandedOpsId) return;
+    if (expandedOpsIds.length > 0) return;
     if (opsRowsSorted.length === 0) return;
-    setExpandedOpsId(String(opsRowsSorted[0].id));
-  }, [expandedOpsId, opsRowsSorted]);
+    const firstId = String(opsRowsSorted[0].id);
+    setExpandedOpsIds([firstId]);
+    setSelectedOpsId(firstId);
+  }, [expandedOpsIds.length, opsRowsSorted]);
 
   const updateOpsRow = (id: string, patch: any) => {
     setOpsRows((prev: any[]) => prev.map((r: any) => (String(r.id) === String(id) ? { ...r, ...patch } : r)));
+  };
+
+  const mockFetchSprintData = () => {
+    const spEstimate = 28 + Math.round(Math.random() * 12);
+    const spDone = Math.max(0, spEstimate - Math.round(Math.random() * 6));
+    const throughput = 7 + Math.round(Math.random() * 6);
+    const bugsVolume = 3 + Math.round(Math.random() * 6);
+    const deadlineAccuracy = Math.min(1, Math.max(0.6, 0.75 + Math.random() * 0.2));
+    return { spEstimate, spDone, throughput, bugsVolume, deadlineAccuracy };
   };
 
   const opsChartData = useMemo(() => {
@@ -571,7 +584,9 @@ export function Dashboard() {
                 type="button"
                 onClick={() => {
                   setIsCreatingOps(true);
-                  setExpandedOpsId('new');
+                  setExpandedOpsIds((prev) => (prev.includes('new') ? prev : ['new', ...prev]));
+                  setSelectedOpsId('new');
+                  setEditingOpsId('');
                 }}
                 className="w-full sm:w-auto px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
               >
@@ -617,123 +632,118 @@ export function Dashboard() {
                 </div>
                 <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Percentual médio de assertividade de prazos por sprint.</div>
               </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-[14px]">
-            {isCreatingOps && (
-              <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-                <button
-                  type="button"
-                  onClick={() => setExpandedOpsId(expandedOpsId === 'new' ? '' : 'new')}
-                  className="w-full flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0 text-left">
-                    <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Nova Sprint</div>
-                    <div className="text-[12px] text-[var(--text-dim)] mt-1">Crie um novo registro de sprint.</div>
-                  </div>
-                  <div className="shrink-0 text-xs font-semibold text-[var(--text2)] bg-[var(--bg4)] px-3 py-2 rounded-md">
-                    {expandedOpsId === 'new' ? 'Recolher' : 'Expandir'}
-                  </div>
-                </button>
-
-                {expandedOpsId === 'new' && (
-                  <>
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {[
-                        { label: 'Data', key: 'date', type: 'date' },
-                        { label: 'Sprint', key: 'sprint', type: 'text' },
-                        { label: 'SP Estimate', key: 'spEstimate', type: 'number' },
-                        { label: 'SP Done', key: 'spDone', type: 'number' },
-                        { label: 'Throuput', key: 'throughput', type: 'number' },
-                        { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
-                        { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number' },
-                      ].map((f) => (
-                        <div key={f.key} className="space-y-1.5">
-                          <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
-                          <input
-                            type={f.type}
-                            value={newOpsDraft?.[f.key] ?? ''}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              setNewOpsDraft((prev: any) => ({
-                                ...(prev || {}),
-                                [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                              }));
-                            }}
-                            className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                          />
-                        </div>
-                      ))}
-                      <div className="space-y-1.5">
-                        <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Velocity</label>
-                        <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text-dim)] px-3 py-2.5 rounded-md text-[13px] font-sans">
-                          Definida no backend
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <label className="flex items-center gap-2 text-[12px] text-[var(--text-mid)] select-none">
                         <input
-                          type="checkbox"
-                          checked={Boolean(opsFetchOnSaveById['new'])}
-                          onChange={(e) => setOpsFetchOnSaveById((prev) => ({ ...(prev || {}), new: e.target.checked }))}
+                          type={f.type}
+                          value={newOpsDraft?.[f.key] ?? ''}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setNewOpsDraft((prev: any) => ({
+                              ...(prev || {}),
+                              [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                            }));
+                          }}
+                          className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                          disabled={editingOpsId !== 'new'}
                         />
-                        Buscar Story Points, Throuput, Bugs da sprint?
-                      </label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCreatingOps(false);
-                            setExpandedOpsId(opsRowsSorted[0]?.id ? String(opsRowsSorted[0].id) : '');
-                          }}
-                          className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const payload = {
-                              id: `ops-${newOpsDraft?.date || Date.now()}`,
-                              date: newOpsDraft?.date,
-                              sprint: newOpsDraft?.sprint,
-                              spEstimate: newOpsDraft?.spEstimate === '' ? null : Number(newOpsDraft?.spEstimate),
-                              spDone: newOpsDraft?.spDone === '' ? null : Number(newOpsDraft?.spDone),
-                              velocity: null,
-                              throughput: newOpsDraft?.throughput === '' ? null : Number(newOpsDraft?.throughput),
-                              bugsVolume: newOpsDraft?.bugsVolume === '' ? null : Number(newOpsDraft?.bugsVolume),
-                              deadlineAccuracy: newOpsDraft?.deadlineAccuracy === '' ? null : Number(newOpsDraft?.deadlineAccuracy),
-                            };
-                            setOpsRows((prev: any[]) => [payload, ...(prev || [])]);
-                            setOpsFetchOnSaveById((prev) => {
-                              const next = { ...(prev || {}) };
-                              delete next['new'];
-                              return next;
-                            });
-                            setIsCreatingOps(false);
-                            setExpandedOpsId(String(payload.id));
-                          }}
-                          className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
-                        >
-                          Salvar
-                        </button>
+                      </div>
+                    ))}
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">Velocity</label>
+                      <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text-dim)] px-3 py-2.5 rounded-md text-[13px] font-sans">
+                        Definida no backend
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
-            )}
+                  </div>
+
+                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedOpsId('new');
+                          setEditingOpsId('new');
+                        }}
+                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fetched = mockFetchSprintData();
+                          setNewOpsDraft((prev: any) => ({
+                            ...(prev || {}),
+                            ...fetched,
+                          }));
+                          setSelectedOpsId('new');
+                          setEditingOpsId('new');
+                        }}
+                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                      >
+                        Buscar dados da sprint
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const payload = {
+                            id: `ops-${newOpsDraft?.date || Date.now()}`,
+                            date: newOpsDraft?.date,
+                            sprint: newOpsDraft?.sprint,
+                            spEstimate: newOpsDraft?.spEstimate === '' ? null : Number(newOpsDraft?.spEstimate),
+                            spDone: newOpsDraft?.spDone === '' ? null : Number(newOpsDraft?.spDone),
+                            velocity: null,
+                            throughput: newOpsDraft?.throughput === '' ? null : Number(newOpsDraft?.throughput),
+                            bugsVolume: newOpsDraft?.bugsVolume === '' ? null : Number(newOpsDraft?.bugsVolume),
+                            deadlineAccuracy: newOpsDraft?.deadlineAccuracy === '' ? null : Number(newOpsDraft?.deadlineAccuracy),
+                          };
+                          setOpsRows((prev: any[]) => [payload, ...(prev || [])]);
+                          setIsCreatingOps(false);
+                          setExpandedOpsIds((prev) => (prev.includes(String(payload.id)) ? prev : [String(payload.id), ...prev.filter((x) => x !== 'new')]));
+                          setSelectedOpsId(String(payload.id));
+                          setEditingOpsId('');
+                        }}
+                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCreatingOps(false);
+                          setEditingOpsId('');
+                          setExpandedOpsIds((prev) => prev.filter((x) => x !== 'new'));
+                          setSelectedOpsId(opsRowsSorted[0]?.id ? String(opsRowsSorted[0].id) : '');
+                        }}
+                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {opsRowsSorted.map((r: any) => {
-              const isExpanded = expandedOpsId === String(r.id);
+              const isExpanded = expandedOpsIds.includes(String(r.id));
+              const isSelected = selectedOpsId === String(r.id);
+              const isEditing = editingOpsId === String(r.id);
               return (
-                <div key={String(r.id)} className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+                <div
+                  key={String(r.id)}
+                  className={`glass-card rounded-xl p-4 sm:p-[18px_20px] border transition-colors ${
+                    isSelected ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)]' : 'border-transparent'
+                  }`}
+                >
                   <button
                     type="button"
-                    onClick={() => setExpandedOpsId(isExpanded ? '' : String(r.id))}
+                    onClick={() => {
+                      setSelectedOpsId(String(r.id));
+                      setExpandedOpsIds((prev) => (prev.includes(String(r.id)) ? prev.filter((x) => x !== String(r.id)) : [String(r.id), ...prev]));
+                    }}
                     className="w-full flex items-start justify-between gap-3"
                   >
                     <div className="min-w-0 text-left">
@@ -771,6 +781,7 @@ export function Dashboard() {
                                 });
                               }}
                               className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                              disabled={!isEditing}
                             />
                           </div>
                         ))}
@@ -783,24 +794,59 @@ export function Dashboard() {
                       </div>
 
                       <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <label className="flex items-center gap-2 text-[12px] text-[var(--text-mid)] select-none">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(opsFetchOnSaveById[String(r.id)])}
-                            onChange={(e) => setOpsFetchOnSaveById((prev) => ({ ...(prev || {}), [String(r.id)]: e.target.checked }))}
-                          />
-                          Buscar Story Points, Throuput, Bugs da sprint?
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpsFetchOnSaveById((prev) => ({ ...(prev || {}), [String(r.id)]: false }));
-                            setExpandedOpsId('');
-                          }}
-                          className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
-                        >
-                          Salvar
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpsDraftById((prev) => ({ ...(prev || {}), [String(r.id)]: { ...r } }));
+                              setSelectedOpsId(String(r.id));
+                              setEditingOpsId(String(r.id));
+                            }}
+                            className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const fetched = mockFetchSprintData();
+                              updateOpsRow(String(r.id), fetched);
+                              setSelectedOpsId(String(r.id));
+                            }}
+                            className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                          >
+                            Buscar dados da sprint
+                          </button>
+                        </div>
+
+                        <div className="flex gap-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingOpsId('');
+                                }}
+                                className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const snapshot = opsDraftById[String(r.id)];
+                                  if (snapshot) updateOpsRow(String(r.id), snapshot);
+                                  setEditingOpsId('');
+                                }}
+                                className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <div />
+                          )}
+                        </div>
                       </div>
                     </>
                   )}
