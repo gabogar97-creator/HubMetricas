@@ -139,9 +139,26 @@ Deno.serve(async (req) => {
         return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
       }
 
-      const total = Number((res.json as any)?.total) || 0;
-      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, total }));
-      return jsonResponse(200, { total, meta: { credSource } });
+      const json: any = res.json as any;
+      const issuesLen = Array.isArray(json?.issues) ? json.issues.length : 0;
+      const totalRaw = json?.total;
+      const totalNum = Number(totalRaw);
+      const total = Number.isFinite(totalNum) ? totalNum : issuesLen;
+      const warningMessages = Array.isArray(json?.warningMessages) ? json.warningMessages : [];
+      const errorMessages = Array.isArray(json?.errorMessages) ? json.errorMessages : [];
+      console.log(
+        JSON.stringify({
+          tag: "jira-ops-sprints",
+          action,
+          sprintId,
+          total,
+          totalRaw,
+          issuesLen,
+          warningMessages,
+          errorMessages,
+        }),
+      );
+      return jsonResponse(200, { total, meta: { credSource, issuesLen, totalRaw, warningMessages, errorMessages } });
     }
 
     if (action === "throughput") {
@@ -170,9 +187,26 @@ Deno.serve(async (req) => {
         return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
       }
 
-      const total = Number((res.json as any)?.total) || 0;
-      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, total }));
-      return jsonResponse(200, { total, meta: { credSource } });
+      const json: any = res.json as any;
+      const issuesLen = Array.isArray(json?.issues) ? json.issues.length : 0;
+      const totalRaw = json?.total;
+      const totalNum = Number(totalRaw);
+      const total = Number.isFinite(totalNum) ? totalNum : issuesLen;
+      const warningMessages = Array.isArray(json?.warningMessages) ? json.warningMessages : [];
+      const errorMessages = Array.isArray(json?.errorMessages) ? json.errorMessages : [];
+      console.log(
+        JSON.stringify({
+          tag: "jira-ops-sprints",
+          action,
+          sprintId,
+          total,
+          totalRaw,
+          issuesLen,
+          warningMessages,
+          errorMessages,
+        }),
+      );
+      return jsonResponse(200, { total, meta: { credSource, issuesLen, totalRaw, warningMessages, errorMessages } });
     }
 
     return jsonResponse(400, { error: `Unsupported action: ${action}`, meta: { credSource } });
