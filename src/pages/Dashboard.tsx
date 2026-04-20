@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAppContext } from '../context/AppContext';
+import { supabase } from '../lib/supabase';
 import { format, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChartBar, Target, Plus, X, Trash2 } from 'lucide-react';
@@ -38,6 +39,13 @@ export function Dashboard() {
   const [editingKr, setEditingKr] = useState<any | null>(null);
   const [collectingKr, setCollectingKr] = useState<any | null>(null);
   const navigate = useNavigate();
+
+  const envJiraEmail = import.meta.env.VITE_JIRA_EMAIL as string | undefined;
+  const envJiraToken = import.meta.env.VITE_JIRA_API_TOKEN as string | undefined;
+  const [opsJiraSprintsLoading, setOpsJiraSprintsLoading] = useState(false);
+  const [opsJiraSprintsError, setOpsJiraSprintsError] = useState<string>('');
+  const [opsJiraSprints, setOpsJiraSprints] = useState<any[]>([]);
+  const [opsJiraMetricsLoading, setOpsJiraMetricsLoading] = useState(false);
 
   const [opsRows, setOpsRows] = useState(() => (
     [
@@ -95,13 +103,58 @@ export function Dashboard() {
   const [isCreatingOps, setIsCreatingOps] = useState(false);
   const [newOpsDraft, setNewOpsDraft] = useState<any>({
     date: new Date().toISOString().split('T')[0],
-    sprint: `Sprint ${opsRows.length + 1}`,
+    sprint: '',
+    sprintId: '',
     spEstimate: '',
     spDone: '',
     throughput: '',
     bugsVolume: '',
     deadlineAccuracy: '',
   });
+
+  const invokeJiraOps = async (payload: any) => {
+    const { data, error } = await supabase.functions.invoke('jira-ops-sprints', {
+      body: {
+        ...(payload || {}),
+        ...(envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken } : {}),
+      },
+    });
+    if (error) throw new Error(error.message || 'Falha ao consultar Jira.');
+    return data as any;
+  };
+
+  const loadOpsJiraSprints = async () => {
+    try {
+      setOpsJiraSprintsLoading(true);
+      setOpsJiraSprintsError('');
+      const data = await invokeJiraOps({ action: 'listSprints' });
+      setOpsJiraSprints(Array.isArray(data?.sprints) ? data.sprints : []);
+    } catch (e: any) {
+      console.error('Failed to load Jira sprints:', e);
+      setOpsJiraSprintsError(e?.message || 'Falha ao carregar sprints do Jira.');
+    } finally {
+      setOpsJiraSprintsLoading(false);
+    }
+  };
+
+  const loadOpsJiraMetricsForSprint = async (sprintId: number) => {
+    try {
+      setOpsJiraMetricsLoading(true);
+      const [bugs, throughput] = await Promise.all([
+        invokeJiraOps({ action: 'bugs', sprintId }),
+        invokeJiraOps({ action: 'throughput', sprintId }),
+      ]);
+      setNewOpsDraft((prev: any) => ({
+        ...(prev || {}),
+        bugsVolume: Number(bugs?.total) || 0,
+        throughput: Number(throughput?.total) || 0,
+      }));
+    } catch (e) {
+      console.error('Failed to load Jira sprint metrics:', e);
+    } finally {
+      setOpsJiraMetricsLoading(false);
+    }
+  };
 
   const opsRowsSorted = useMemo(() => {
     return [...(opsRows || [])].sort((a: any, b: any) => {
@@ -584,9 +637,20 @@ export function Dashboard() {
                 type="button"
                 onClick={() => {
                   setIsCreatingOps(true);
+                  setNewOpsDraft({
+                    date: new Date().toISOString().split('T')[0],
+                    sprint: '',
+                    sprintId: '',
+                    spEstimate: '',
+                    spDone: '',
+                    throughput: '',
+                    bugsVolume: '',
+                    deadlineAccuracy: '',
+                  });
                   setExpandedOpsIds((prev) => (prev.includes('new') ? prev : ['new', ...prev]));
                   setSelectedOpsId('new');
                   setEditingOpsId('');
+                  loadOpsJiraSprints();
                 }}
                 className="w-full sm:w-auto px-4 py-2 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors"
               >
@@ -632,19 +696,52 @@ export function Dashboard() {
                 </div>
                 <div className="text-[11px] text-[var(--text-dim)] mt-1.5">Percentual médio de assertividade de prazos por sprint.</div>
               </div>
-                        <input
-                          type={f.type}
-                          value={newOpsDraft?.[f.key] ?? ''}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setNewOpsDraft((prev: any) => ({
-                              ...(prev || {}),
-                              [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                            }));
-                          }}
-                          className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                          disabled={editingOpsId !== 'new'}
-                        />
+                        {f.key === 'sprint' ? (
+                          <>
+                            <select
+                              value={String(newOpsDraft?.sprintId ?? '')}
+                              onChange={(e) => {
+                                const nextId = e.target.value;
+                                const selected = (opsJiraSprints || []).find((s: any) => String(s?.id) === String(nextId));
+                                setNewOpsDraft((prev: any) => ({
+                                  ...(prev || {}),
+                                  sprintId: nextId,
+                                  sprint: selected?.name ? String(selected.name) : '',
+                                }));
+                                const idNum = Number(nextId);
+                                if (!Number.isNaN(idNum) && idNum > 0) {
+                                  loadOpsJiraMetricsForSprint(idNum);
+                                }
+                              }}
+                              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                              disabled={editingOpsId !== 'new' || opsJiraSprintsLoading || opsJiraMetricsLoading}
+                            >
+                              <option value="">{opsJiraSprintsLoading ? 'Carregando…' : 'Selecione uma sprint…'}</option>
+                              {(opsJiraSprints || []).map((s: any) => (
+                                <option key={String(s?.id)} value={String(s?.id)}>
+                                  {String(s?.name || '')} | {String(s?.state || '')}
+                                </option>
+                              ))}
+                            </select>
+                            {opsJiraSprintsError && (
+                              <div className="text-[12px] text-[var(--red)] mt-2">{opsJiraSprintsError}</div>
+                            )}
+                          </>
+                        ) : (
+                          <input
+                            type={f.type}
+                            value={newOpsDraft?.[f.key] ?? ''}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setNewOpsDraft((prev: any) => ({
+                                ...(prev || {}),
+                                [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                              }));
+                            }}
+                            className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+                            disabled={editingOpsId !== 'new'}
+                          />
+                        )}
                       </div>
                     ))}
                     <div className="space-y-1.5">
@@ -667,24 +764,26 @@ export function Dashboard() {
                       >
                         Editar
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const fetched = mockFetchSprintData();
-                          setNewOpsDraft((prev: any) => ({
-                            ...(prev || {}),
-                            ...fetched,
-                          }));
-                          setSelectedOpsId('new');
-                          setEditingOpsId('new');
-                        }}
-                        className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                      >
-                        Buscar dados da sprint
-                      </button>
                     </div>
 
                     <div className="flex gap-2">
+                      {editingOpsId === 'new' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fetched = mockFetchSprintData();
+                            setNewOpsDraft((prev: any) => ({
+                              ...(prev || {}),
+                              ...fetched,
+                            }));
+                            setSelectedOpsId('new');
+                            setEditingOpsId('new');
+                          }}
+                          className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                        >
+                          Buscar dados da sprint
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -692,6 +791,7 @@ export function Dashboard() {
                             id: `ops-${newOpsDraft?.date || Date.now()}`,
                             date: newOpsDraft?.date,
                             sprint: newOpsDraft?.sprint,
+                            sprintId: newOpsDraft?.sprintId,
                             spEstimate: newOpsDraft?.spEstimate === '' ? null : Number(newOpsDraft?.spEstimate),
                             spDone: newOpsDraft?.spDone === '' ? null : Number(newOpsDraft?.spDone),
                             velocity: null,
@@ -735,7 +835,7 @@ export function Dashboard() {
                 <div
                   key={String(r.id)}
                   className={`glass-card rounded-xl p-4 sm:p-[18px_20px] border transition-colors ${
-                    isSelected ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)]' : 'border-transparent'
+                    isSelected ? 'border-[rgba(56,189,248,0.55)] bg-[rgba(56,189,248,0.12)] ring-2 ring-[rgba(56,189,248,0.35)]' : 'border-transparent'
                   }`}
                 >
                   <button
@@ -806,22 +906,23 @@ export function Dashboard() {
                           >
                             Editar
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const fetched = mockFetchSprintData();
-                              updateOpsRow(String(r.id), fetched);
-                              setSelectedOpsId(String(r.id));
-                            }}
-                            className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                          >
-                            Buscar dados da sprint
-                          </button>
                         </div>
 
                         <div className="flex gap-2">
                           {isEditing ? (
                             <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const fetched = mockFetchSprintData();
+                                  updateOpsRow(String(r.id), fetched);
+                                  setSelectedOpsId(String(r.id));
+                                  setEditingOpsId(String(r.id));
+                                }}
+                                className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                              >
+                                Buscar dados da sprint
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {

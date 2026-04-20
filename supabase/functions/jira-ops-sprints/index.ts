@@ -1,0 +1,175 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+declare const Deno: any;
+
+const JIRA_BASE_URL = "https://zucchettibr.atlassian.net";
+const BOARD_ID = 330;
+
+type Action = "listSprints" | "bugs" | "throughput";
+
+type RequestBody = {
+  action?: Action;
+  sprintId?: number | string;
+  jiraEmail?: string;
+  jiraApiToken?: string;
+};
+
+const jsonResponse = (status: number, payload: unknown) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      },
+    });
+  }
+
+  try {
+    if (req.method !== "POST") {
+      return jsonResponse(405, { error: "Method not allowed. Use POST." });
+    }
+
+    const body = (await req.json().catch(() => ({}))) as RequestBody;
+
+    const secretEmail = Deno.env.get("JIRA_EMAIL") || "";
+    const secretToken = Deno.env.get("JIRA_API_TOKEN") || "";
+
+    const bodyEmail = body?.jiraEmail ? String(body.jiraEmail) : "";
+    const bodyToken = body?.jiraApiToken ? String(body.jiraApiToken) : "";
+
+    const jiraEmail = bodyEmail || secretEmail;
+    const jiraApiToken = bodyToken || secretToken;
+    const credSource = bodyEmail && bodyToken ? "body" : secretEmail && secretToken ? "secrets" : "none";
+
+    if (!jiraEmail || !jiraApiToken) {
+      return jsonResponse(500, {
+        error:
+          "Missing Jira credentials. Provide jiraEmail/jiraApiToken in request body (POC) or set JIRA_EMAIL/JIRA_API_TOKEN as Supabase secrets.",
+        meta: { credSource },
+      });
+    }
+
+    const action = body?.action;
+    if (!action) {
+      return jsonResponse(400, { error: "Missing action.", meta: { credSource } });
+    }
+
+    const auth = btoa(`${jiraEmail}:${jiraApiToken}`);
+
+    const fetchJira = async (url: string) => {
+      const jiraRes = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: "application/json",
+        },
+      });
+
+      if (!jiraRes.ok) {
+        const details = await jiraRes.text();
+        return { ok: false as const, status: jiraRes.status, details };
+      }
+
+      const json = await jiraRes.json();
+      return { ok: true as const, json };
+    };
+
+    if (action === "listSprints") {
+      const url = `${JIRA_BASE_URL}/rest/agile/1.0/board/${BOARD_ID}/sprint`;
+      const res = await fetchJira(url);
+      if (!res.ok) {
+        return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
+      }
+
+      const values = Array.isArray((res.json as any)?.values) ? (res.json as any).values : [];
+      const sprints = values.map((s: any) => ({
+        id: s?.id,
+        name: s?.name,
+        state: s?.state,
+        startDate: s?.startDate,
+        endDate: s?.endDate,
+        completeDate: s?.completeDate,
+      }));
+
+      return jsonResponse(200, { sprints, meta: { credSource } });
+    }
+
+    const sprintIdRaw = body?.sprintId;
+    const sprintId = sprintIdRaw == null ? null : Number(sprintIdRaw);
+    if (!sprintId || Number.isNaN(sprintId)) {
+      return jsonResponse(400, { error: "Missing or invalid sprintId.", meta: { credSource } });
+    }
+
+    if (action === "bugs") {
+      const jql = `project = IA AND type = Bug AND sprint = ${sprintId} ORDER BY created DESC`;
+      const fields = [
+        "summary",
+        "key",
+        "description",
+        "status",
+        "created",
+        "updated",
+        "startDate",
+        "endDate",
+        "customfield_10848",
+        "customfield_10849",
+        "customfield_10851",
+        "customfield_10852",
+        "customfield_10853",
+        "customfield_10020",
+      ].join(",");
+
+      const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+      const res = await fetchJira(url);
+      if (!res.ok) {
+        return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
+      }
+
+      const total = Number((res.json as any)?.total) || 0;
+      return jsonResponse(200, { total, meta: { credSource } });
+    }
+
+    if (action === "throughput") {
+      const jql = `project = IA AND sprint = ${sprintId} AND type IN ("Implementações", Bug) AND status = "Concluído" ORDER BY created DESC`;
+      const fields = [
+        "summary",
+        "key",
+        "description",
+        "status",
+        "created",
+        "updated",
+        "startDate",
+        "endDate",
+        "customfield_10848",
+        "customfield_10849",
+        "customfield_10851",
+        "customfield_10852",
+        "customfield_10853",
+        "customfield_10020",
+      ].join(",");
+
+      const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+      const res = await fetchJira(url);
+      if (!res.ok) {
+        return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
+      }
+
+      const total = Number((res.json as any)?.total) || 0;
+      return jsonResponse(200, { total, meta: { credSource } });
+    }
+
+    return jsonResponse(400, { error: `Unsupported action: ${action}`, meta: { credSource } });
+  } catch (e) {
+    return jsonResponse(500, { error: String(e) });
+  }
+});
