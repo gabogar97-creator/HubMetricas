@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "spDone") {
-      const jql = `project = IA AND sprint = ${sprintId} AND type IN ("Implementações", Bug) AND status = "Concluído" ORDER BY created DESC`;
+      const jql = `project = IA AND sprint = ${sprintId} AND type IN (Epic, Story, "Implementações") ORDER BY created DESC`;
       const fields = [
         "summary",
         "key",
@@ -190,6 +190,8 @@ Deno.serve(async (req) => {
       const json: any = res.json as any;
       const issues = Array.isArray(json?.issues) ? json.issues : [];
       const sum = issues.reduce((acc: number, issue: any) => {
+        const statusName = String(issue?.fields?.status?.name || '');
+        if (statusName !== 'Concluído') return acc;
         const raw = issue?.fields?.customfield_10016;
         const n = raw == null ? 0 : Number(raw);
         return acc + (Number.isFinite(n) ? n : 0);
@@ -243,7 +245,10 @@ Deno.serve(async (req) => {
       const json: any = res.json as any;
       const issues = Array.isArray(json?.issues) ? json.issues : [];
       const notEstimatedIssues = issues
-        .filter((issue: any) => issue?.fields?.customfield_10016 == null)
+        .filter((issue: any) => {
+          const statusName = String(issue?.fields?.status?.name || '');
+          return statusName === 'Concluído' && issue?.fields?.customfield_10016 == null;
+        })
         .map((issue: any) => ({
           key: issue?.key,
           summary: issue?.fields?.summary,
