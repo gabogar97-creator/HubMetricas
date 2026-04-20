@@ -5,7 +5,7 @@ declare const Deno: any;
 const JIRA_BASE_URL = "https://zucchettibr.atlassian.net";
 const BOARD_ID = 330;
 
-type Action = "listSprints" | "bugs" | "throughput";
+type Action = "listSprints" | "bugs" | "throughput" | "spDone";
 
 type RequestBody = {
   action?: Action;
@@ -159,6 +159,59 @@ Deno.serve(async (req) => {
         }),
       );
       return jsonResponse(200, { total, meta: { credSource, issuesLen, totalRaw, warningMessages, errorMessages } });
+    }
+
+    if (action === "spDone") {
+      const jql = `project = IA AND sprint = ${sprintId} AND type IN ("Implementações", Bug) AND status = "Concluído" ORDER BY created DESC`;
+      const fields = [
+        "summary",
+        "key",
+        "status",
+        "created",
+        "updated",
+        "startDate",
+        "endDate",
+        "customfield_10848",
+        "customfield_10849",
+        "customfield_10851",
+        "customfield_10852",
+        "customfield_10853",
+        "customfield_10020",
+        "customfield_10016",
+      ].join(",");
+
+      const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId, jql, url }));
+      const res = await fetchJira(url);
+      if (!res.ok) {
+        return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
+      }
+
+      const json: any = res.json as any;
+      const issues = Array.isArray(json?.issues) ? json.issues : [];
+      const sum = issues.reduce((acc: number, issue: any) => {
+        const raw = issue?.fields?.customfield_10016;
+        const n = raw == null ? 0 : Number(raw);
+        return acc + (Number.isFinite(n) ? n : 0);
+      }, 0);
+
+      const issuesLen = issues.length;
+      const totalRaw = json?.total;
+      const warningMessages = Array.isArray(json?.warningMessages) ? json.warningMessages : [];
+      const errorMessages = Array.isArray(json?.errorMessages) ? json.errorMessages : [];
+      console.log(
+        JSON.stringify({
+          tag: "jira-ops-sprints",
+          action,
+          sprintId,
+          sum,
+          issuesLen,
+          totalRaw,
+          warningMessages,
+          errorMessages,
+        }),
+      );
+      return jsonResponse(200, { sum, meta: { credSource, issuesLen, totalRaw, warningMessages, errorMessages } });
     }
 
     if (action === "throughput") {

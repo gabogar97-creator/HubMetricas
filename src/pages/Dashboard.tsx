@@ -94,20 +94,23 @@ export function Dashboard() {
     try {
       setOpsJiraMetricsLoading(true);
       console.log('[ops] loading Jira metrics for sprint', { sprintId });
-      const [bugs, throughput] = await Promise.all([
+      const [bugs, throughput, spDone] = await Promise.all([
         invokeJiraOps({ action: 'bugs', sprintId }),
         invokeJiraOps({ action: 'throughput', sprintId }),
+        invokeJiraOps({ action: 'spDone', sprintId }),
       ]);
 
       console.log('[ops] Jira metrics response', {
         sprintId,
         bugsTotal: (bugs as any)?.total,
         throughputTotal: (throughput as any)?.total,
+        spDone: (spDone as any)?.sum,
       });
       setNewOpsDraft((prev: any) => ({
         ...(prev || {}),
         bugsVolume: Number(bugs?.total) || 0,
         throughput: Number(throughput?.total) || 0,
+        spDone: (spDone as any)?.sum == null || Number.isNaN(Number((spDone as any)?.sum)) ? '' : Number((spDone as any)?.sum),
       }));
     } catch (e) {
       console.error('Failed to load Jira sprint metrics:', e);
@@ -753,23 +756,6 @@ export function Dashboard() {
                     </div>
 
                     <div className="flex gap-2">
-                      {editingOpsId === 'new' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const fetched = mockFetchSprintData();
-                            setNewOpsDraft((prev: any) => ({
-                              ...(prev || {}),
-                              ...fetched,
-                            }));
-                            setSelectedOpsId('new');
-                            setEditingOpsId('new');
-                          }}
-                          className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                        >
-                          Buscar dados da sprint
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -897,18 +883,6 @@ export function Dashboard() {
                         <div className="flex gap-2">
                           {isEditing ? (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const fetched = mockFetchSprintData();
-                                  updateOpsRow(String(r.id), fetched);
-                                  setSelectedOpsId(String(r.id));
-                                  setEditingOpsId(String(r.id));
-                                }}
-                                className="px-4 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                              >
-                                Buscar dados da sprint
-                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
