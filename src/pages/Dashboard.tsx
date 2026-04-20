@@ -693,7 +693,7 @@ export function Dashboard() {
                                 }
                               }}
                               className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-                              disabled={editingOpsId !== 'new' || opsJiraSprintsLoading || opsJiraMetricsLoading}
+                              disabled={opsJiraSprintsLoading || opsJiraMetricsLoading}
                             >
                               <option value="">{opsJiraSprintsLoading ? 'Carregando…' : 'Selecione uma sprint…'}</option>
                               {(opsJiraSprints || []).map((s: any) => (
