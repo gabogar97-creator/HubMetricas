@@ -132,9 +132,17 @@ export function Dashboard() {
   const computeDeadlineAccuracy = (agreedRaw: any, metRaw: any) => {
     const agreed = agreedRaw === '' || agreedRaw == null ? null : Number(agreedRaw);
     const met = metRaw === '' || metRaw == null ? null : Number(metRaw);
-    if (!agreed || Number.isNaN(agreed) || agreed <= 0) return '';
+    if (agreed === 0 && met === 0) return 1;
+    if (agreed == null || Number.isNaN(agreed) || agreed <= 0) return '';
     if (met == null || Number.isNaN(met) || met < 0) return '';
     return met / agreed;
+  };
+
+  const fmtPct01 = (v: any) => {
+    if (v == null || v === '') return '—';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return `${(n * 100).toFixed(1).replace('.', ',')}%`;
   };
 
   useEffect(() => {
@@ -890,35 +898,41 @@ export function Dashboard() {
                                 { label: 'Volume Bugs', key: 'bugsVolume', type: 'number', dbKey: 'bugs_volume' },
                                 { label: 'Quantidade Prazos Combinados', key: 'deadlinesAgreed', type: 'number', dbKey: 'deadlines_agreed' },
                                 { label: 'Quantidade de Prazos Cumpridos', key: 'deadlinesMet', type: 'number', dbKey: 'deadlines_met' },
-                                { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', dbKey: 'deadline_accuracy', readonly: true },
+                                { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', dbKey: 'deadline_accuracy', readonly: true, isPercent: true },
                                 { label: 'Velocity', key: 'velocity', type: 'number', dbKey: 'velocity', isVelocity: true },
                               ].map((f) => (
                                 <div key={f.key} className="space-y-1.5">
                                   <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
-                                  <input
-                                    type={f.type}
-                                    value={(r as any)[f.dbKey] ?? (r as any)[f.key] ?? ''}
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
-                                      updateOpsRow(String(r.id), (prev: any) => {
-                                        const nextPatch: any = {
-                                          [f.dbKey]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                                        };
-                                        const agreed = f.dbKey === 'deadlines_agreed' ? nextPatch[f.dbKey] : (prev as any)?.deadlines_agreed;
-                                        const met = f.dbKey === 'deadlines_met' ? nextPatch[f.dbKey] : (prev as any)?.deadlines_met;
-                                        if (f.dbKey === 'deadlines_agreed' || f.dbKey === 'deadlines_met') {
-                                          nextPatch.deadline_accuracy = computeDeadlineAccuracy(agreed, met);
-                                        }
-                                        return nextPatch;
-                                      });
-                                    }}
-                                    className={`w-full border text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans outline-none transition-colors ${
-                                      (f as any).isVelocity
-                                        ? 'bg-[rgba(245,158,11,0.12)] border-[rgba(245,158,11,0.35)] focus:border-[rgba(245,158,11,0.6)]'
-                                        : 'bg-[var(--bg4)] border-[var(--border2)] focus:border-[var(--accent)]'
-                                    }`}
-                                    disabled={!isEditing || !!(f as any).readonly}
-                                  />
+                                  {(f as any).isPercent ? (
+                                    <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans">
+                                      {fmtPct01((r as any)[f.dbKey] ?? (r as any)[f.key])}
+                                    </div>
+                                  ) : (
+                                    <input
+                                      type={f.type}
+                                      value={(r as any)[f.dbKey] ?? (r as any)[f.key] ?? ''}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        updateOpsRow(String(r.id), (prev: any) => {
+                                          const nextPatch: any = {
+                                            [f.dbKey]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                                          };
+                                          const agreed = f.dbKey === 'deadlines_agreed' ? nextPatch[f.dbKey] : (prev as any)?.deadlines_agreed;
+                                          const met = f.dbKey === 'deadlines_met' ? nextPatch[f.dbKey] : (prev as any)?.deadlines_met;
+                                          if (f.dbKey === 'deadlines_agreed' || f.dbKey === 'deadlines_met') {
+                                            nextPatch.deadline_accuracy = computeDeadlineAccuracy(agreed, met);
+                                          }
+                                          return nextPatch;
+                                        });
+                                      }}
+                                      className={`w-full border text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans outline-none transition-colors ${
+                                        (f as any).isVelocity
+                                          ? 'bg-[rgba(245,158,11,0.12)] border-[rgba(245,158,11,0.35)] focus:border-[rgba(245,158,11,0.6)]'
+                                          : 'bg-[var(--bg4)] border-[var(--border2)] focus:border-[var(--accent)]'
+                                      }`}
+                                      disabled={!isEditing || !!(f as any).readonly}
+                                    />
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1343,31 +1357,37 @@ export function Dashboard() {
                   { label: 'Volume Bugs', key: 'bugsVolume', type: 'number' },
                   { label: 'Quantidade Prazos Combinados', key: 'deadlinesAgreed', type: 'number' },
                   { label: 'Quantidade de Prazos Cumpridos', key: 'deadlinesMet', type: 'number' },
-                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', readonly: true },
+                  { label: 'Assertividade de Prazos', key: 'deadlineAccuracy', type: 'number', readonly: true, isPercent: true },
                 ].map((f: any) => (
                   <div key={f.key} className="space-y-1.5">
                     <label className="block text-[11px] font-mono uppercase tracking-widest text-[var(--text3)]">{f.label}</label>
-                    <input
-                      type={f.type}
-                      value={newOpsDraft?.[f.key] ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setNewOpsDraft((prev: any) => {
-                          const next = {
-                            ...(prev || {}),
-                            [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
-                          } as any;
-                          if (f.key === 'deadlinesAgreed' || f.key === 'deadlinesMet') {
-                            next.deadlineAccuracy = computeDeadlineAccuracy(next.deadlinesAgreed, next.deadlinesMet);
-                          }
-                          return next;
-                        });
-                      }}
-                      className={`w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors ${
-                        f.readonly ? 'opacity-90' : ''
-                      }`}
-                      disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !!f.readonly}
-                    />
+                    {f.isPercent ? (
+                      <div className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans">
+                        {fmtPct01(newOpsDraft?.deadlineAccuracy)}
+                      </div>
+                    ) : (
+                      <input
+                        type={f.type}
+                        value={newOpsDraft?.[f.key] ?? ''}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setNewOpsDraft((prev: any) => {
+                            const next = {
+                              ...(prev || {}),
+                              [f.key]: f.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw,
+                            } as any;
+                            if (f.key === 'deadlinesAgreed' || f.key === 'deadlinesMet') {
+                              next.deadlineAccuracy = computeDeadlineAccuracy(next.deadlinesAgreed, next.deadlinesMet);
+                            }
+                            return next;
+                          });
+                        }}
+                        className={`w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2.5 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors ${
+                          f.readonly ? 'opacity-90' : ''
+                        }`}
+                        disabled={opsJiraMetricsLoading || !opsCreatingMetricsLoaded || !!f.readonly}
+                      />
+                    )}
                   </div>
                 ))}
 
