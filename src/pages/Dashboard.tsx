@@ -259,16 +259,14 @@ export function Dashboard() {
     });
   }, [opsRows]);
 
-  useEffect(() => {
-    if (expandedOpsIds.length > 0) return;
-    if (opsRowsSorted.length === 0) return;
-    const firstId = String(opsRowsSorted[0].id);
-    setExpandedOpsIds([firstId]);
-    setSelectedOpsId(firstId);
-  }, [expandedOpsIds.length, opsRowsSorted]);
-
   const updateOpsRow = (id: string, patch: any) => {
-    setOpsRows((prev: any[]) => prev.map((r: any) => (String(r.id) === String(id) ? { ...r, ...patch } : r)));
+    setOpsRows((prev: any[]) =>
+      prev.map((r: any) => {
+        if (String(r.id) !== String(id)) return r;
+        const computedPatch = typeof patch === 'function' ? patch(r) : patch;
+        return { ...r, ...(computedPatch || {}) };
+      }),
+    );
   };
 
   const mockFetchSprintData = () => ({
