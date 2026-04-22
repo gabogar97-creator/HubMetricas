@@ -70,10 +70,12 @@ export function PrioritizationQueue() {
       setJiraLoading(true);
       setJiraError('');
 
+      const effectiveListType = opts?.listType || queueListTab;
+
       const { data, error } = await supabase.functions.invoke('jira-prioritization-epics', {
         body: {
           ...(opts?.jiraEmail && opts?.jiraApiToken ? { jiraEmail: opts.jiraEmail, jiraApiToken: opts.jiraApiToken } : {}),
-          listType: opts?.listType || queueListTab,
+          listType: effectiveListType,
         },
       });
       if (error) {
@@ -106,7 +108,7 @@ export function PrioritizationQueue() {
             scope: jiraDescriptionToText(i?.description),
             effort: 'low',
             roi: i?.customfield_10848 != null && Number(i.customfield_10848) >= 0 ? 'high' : 'low',
-            status: 'to_prioritize',
+            status: effectiveListType,
           };
       });
 
