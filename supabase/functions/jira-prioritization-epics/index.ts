@@ -19,10 +19,12 @@ Deno.serve(async (req) => {
 
     let bodyEmail = "";
     let bodyToken = "";
+    let listType = "to_prioritize";
     if (req.method !== "GET") {
       const body = await req.json().catch(() => ({}));
       bodyEmail = body?.jiraEmail ? String(body.jiraEmail) : "";
       bodyToken = body?.jiraApiToken ? String(body.jiraApiToken) : "";
+      listType = body?.listType ? String(body.listType) : "to_prioritize";
     }
 
     const jiraEmail = bodyEmail || secretEmail;
@@ -47,7 +49,9 @@ Deno.serve(async (req) => {
     }
 
     const jql =
-      'project=IA AND issuetype=Epic AND status IN ("AG. PRIORIZAÇÃO", "EM DEV PELO SOLICITANTE", "EM REFINAMENTO", "EM ANÁLISE") ORDER BY created DESC';
+      listType === "prioritized"
+        ? 'project = IA AND issuetype = Epic AND status IN ("Em desenvolvimento", "Em Homologação", "Em monitoramento") ORDER BY created DESC'
+        : 'project=IA AND issuetype=Epic AND status IN ("AG. PRIORIZAÇÃO", "EM DEV PELO SOLICITANTE", "EM REFINAMENTO", "EM ANÁLISE") ORDER BY created DESC';
 
     const fields = [
       "summary",

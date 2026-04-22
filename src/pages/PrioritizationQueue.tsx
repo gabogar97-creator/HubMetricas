@@ -65,13 +65,16 @@ export function PrioritizationQueue() {
     return text;
   };
 
-  const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string }) => {
+  const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string; listType?: 'to_prioritize' | 'prioritized' }) => {
     try {
       setJiraLoading(true);
       setJiraError('');
 
       const { data, error } = await supabase.functions.invoke('jira-prioritization-epics', {
-        body: opts?.jiraEmail && opts?.jiraApiToken ? { jiraEmail: opts.jiraEmail, jiraApiToken: opts.jiraApiToken } : undefined,
+        body: {
+          ...(opts?.jiraEmail && opts?.jiraApiToken ? { jiraEmail: opts.jiraEmail, jiraApiToken: opts.jiraApiToken } : {}),
+          listType: opts?.listType || queueListTab,
+        },
       });
       if (error) {
         throw new Error(error.message || 'Falha ao consultar Jira.');
@@ -121,9 +124,9 @@ export function PrioritizationQueue() {
   };
 
   useEffect(() => {
-    loadJiraEpics(envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken } : undefined);
+    loadJiraEpics(envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken, listType: queueListTab } : { listType: queueListTab });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [queueListTab]);
 
   const queueProjects = useMemo(() => {
     return jiraProjects;
