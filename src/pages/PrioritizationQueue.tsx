@@ -22,6 +22,23 @@ export function PrioritizationQueue() {
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
+  const asText = (v: any, fallback = '—') => {
+    if (v == null) return fallback;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (typeof v === 'object') {
+      if (typeof (v as any).value === 'string') return (v as any).value;
+      if (typeof (v as any).name === 'string') return (v as any).name;
+      if (typeof (v as any).text === 'string') return (v as any).text;
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
   const jiraDescriptionToText = (desc: any): string => {
     if (!desc) return '';
     if (typeof desc === 'string') return desc;
@@ -71,17 +88,17 @@ export function PrioritizationQueue() {
             id: i?.id,
             jiraKey: i?.key,
             title: i?.summary,
-            jiraStatus: i?.status ?? '',
+            jiraStatus: asText(i?.status, ''),
             created: i?.created ?? '',
             updated: i?.updated ?? '',
             startDate: i?.startDate ?? '',
             endDate: i?.endDate ?? '',
             estimateDays: storyPointsOrDays != null && !isNaN(Number(storyPointsOrDays)) ? Number(storyPointsOrDays) : null,
-            bu: i?.customfield_10851 ?? '—',
-            buArea: i?.customfield_10852 ?? '—',
-            sponsor: i?.customfield_10853 ?? '—',
+            bu: asText(i?.customfield_10851, '—'),
+            buArea: asText(i?.customfield_10852, '—'),
+            sponsor: asText(i?.customfield_10853, '—'),
             estimatedRoi12m: i?.customfield_10848 != null && !isNaN(Number(i.customfield_10848)) ? Number(i.customfield_10848) : null,
-            calcMemory: i?.customfield_10849 ?? '—',
+            calcMemory: asText(i?.customfield_10849, '—'),
             estimatedCost: cost,
             scope: jiraDescriptionToText(i?.description),
             effort: 'low',
