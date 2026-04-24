@@ -120,13 +120,16 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { sprints, meta: { credSource } });
     }
 
+    const needsSprintId = ["bugs", "throughput", "spDone", "spEstimate"].includes(action);
     const sprintIdRaw = body?.sprintId;
     const sprintId = sprintIdRaw == null ? null : Number(sprintIdRaw);
-    if (!sprintId || Number.isNaN(sprintId)) {
+    if (needsSprintId && (!sprintId || Number.isNaN(sprintId))) {
       return jsonResponse(400, { error: "Missing or invalid sprintId.", meta: { credSource } });
     }
 
-    console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId }));
+    if (needsSprintId) {
+      console.log(JSON.stringify({ tag: "jira-ops-sprints", action, sprintId }));
+    }
 
     if (action === "bugs") {
       const jql = `project = IA AND type = Bug AND sprint = ${sprintId} ORDER BY created DESC`;
