@@ -310,12 +310,10 @@ export function Projects() {
 
     rows.forEach((c: any) => {
       const dateKey = (c?.date || '').split('T')[0];
-      const descKey = String(c?.description || '').trim();
-      const key = `${dateKey}__${descKey}`;
+      const key = `${dateKey}`;
       const existing = byKey.get(key) || {
         key,
         date: c?.date,
-        description: c?.description || '',
         ids: [] as number[],
         raw: [] as any[],
         cost: 0,
@@ -336,7 +334,6 @@ export function Projects() {
       else if (c.type === 'Revenue') existing.revenue += v;
 
       if (!existing.date && c?.date) existing.date = c.date;
-      if (!existing.description && c?.description) existing.description = c.description;
       byKey.set(key, existing);
     });
 
@@ -553,7 +550,7 @@ export function Projects() {
           {/* Collections */}
           <div className="glass-card rounded-xl p-[18px_20px]">
             <div className="flex justify-between items-center mb-4">
-              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Coletas Registradas ({pc.length})</div>
+              <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Coletas Registradas ({groupedCollections.length})</div>
               <button 
                 className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity"
                 onClick={() => setWizard(true)}
@@ -570,7 +567,7 @@ export function Projects() {
                 <table className="w-full border-collapse text-xs">
                   <thead>
                     <tr>
-                      {["Data","Descrição","Investimento","Custo Jira","Saving","Custo Evitado","Receita","Total Retorno","ROI",""] .map(h => (
+                      {["Data","Investimento","Custo Jira","Saving","Custo Evitado","Receita","Total Retorno","ROI",""] .map(h => (
                         <th key={h} className="p-[9px_12px] text-left bg-[var(--surface-high)] text-[var(--text-dim)] font-bold text-[10px] uppercase tracking-[0.07em] border-b border-[var(--border)] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -590,7 +587,6 @@ export function Projects() {
                           className="cursor-pointer hover:bg-[var(--surface-high)] transition-colors"
                         >
                           <td className="p-[10px_12px] border-b border-[var(--border)] font-semibold text-[var(--text)]">{fmtDate(g.date)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--text-mid)]">{g.description || (primary?.type || '')}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(invC)}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(g.costJira || 0)}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--saving)]">{fmt(g.saving || 0)}</td>
