@@ -5,13 +5,28 @@ declare const Deno: any;
 const JIRA_BASE_URL = "https://zucchettibr.atlassian.net";
 const BOARD_ID = 330;
 
-type Action = "listSprints" | "bugs" | "throughput" | "spDone" | "spEstimate";
+type Action = "listSprints" | "bugs" | "throughput" | "spDone" | "spEstimate" | "spEstimateByKeys";
 
 type RequestBody = {
   action?: Action;
   sprintId?: number | string;
   jiraEmail?: string;
   jiraApiToken?: string;
+  keys?: string | string[];
+};
+
+type JiraSearchIssue = {
+  id?: string;
+  key?: string;
+  fields?: Record<string, any>;
+};
+
+const parseKeysInput = (raw: any): string[] => {
+  const input = Array.isArray(raw) ? raw.join(',') : String(raw ?? '');
+  return input
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 };
 
 const jsonResponse = (status: number, payload: unknown) =>
@@ -284,6 +299,69 @@ Deno.serve(async (req) => {
         notEstimatedCount,
         notEstimatedIssues,
         meta: { credSource, issuesLen, totalRaw, warningMessages, errorMessages },
+      });
+    }
+
+    if (action === "spEstimateByKeys") {
+      const keys = parseKeysInput(body?.keys);
+      if (!keys.length) {
+        return jsonResponse(200, { totalStoryPoints: 0, issueCount: 0, notEstimatedCount: 0, notEstimated: [] });
+      }
+
+      const quoted = keys.map((k) => `"${k.replace(/\"/g, '')}"`).join(',');
+      const jql = `("Epic Link" in (${quoted}) OR parent in (${quoted}))`;
+      const fields = ['key', 'summary', 'status', 'customfield_10016'].join(',');
+      const maxResults = 100;
+      let startAt = 0;
+      let totalStoryPoints = 0;
+      let issueCount = 0;
+      const notEstimated: any[] = [];
+
+      while (true) {
+        const url = `https://zucchettibr.atlassian.net/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=${maxResults}&startAt=${startAt}`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Authorization: `Basic ${auth}`,
+            Accept: 'application/json'
+          }
+        });
+
+        if (!res.ok) {
+          const t = await res.text();
+          return jsonResponse(500, { error: `Jira request failed: ${res.status}`, details: t });
+        }
+
+        const json: any = await res.json();
+        const issues = (json?.issues || []) as JiraSearchIssue[];
+
+        issues.forEach((iss: any) => {
+          issueCount += 1;
+          const sp = iss?.fields?.customfield_10016;
+          const spNum = sp == null ? null : Number(sp);
+          if (spNum == null || Number.isNaN(spNum)) {
+            notEstimated.push({
+              key: iss?.key,
+              summary: iss?.fields?.summary,
+              status: iss?.fields?.status?.name
+            });
+          } else {
+            totalStoryPoints += spNum;
+          }
+        });
+
+        const total = Number(json?.total) || 0;
+        startAt += issues.length;
+        if (!issues.length || startAt >= total) break;
+      }
+
+      return jsonResponse(200, {
+        keys,
+        jql,
+        totalStoryPoints,
+        issueCount,
+        notEstimatedCount: notEstimated.length,
+        notEstimated
       });
     }
 

@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { Plus, X, FolderOpen, Edit2, Trash2, ArrowRight, ArrowLeft, Save, Clock } from 'lucide-react';
 import { addMonths, format, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { supabase } from '../lib/supabase';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const fmt = (n: number | null) => n == null || isNaN(n) ? "R$ —" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
@@ -303,6 +304,57 @@ export function Projects() {
     };
   }, [project]);
 
+  const groupedCollections = useMemo(() => {
+    const rows = pc || [];
+    const byKey = new Map<string, any>();
+
+    rows.forEach((c: any) => {
+      const dateKey = (c?.date || '').split('T')[0];
+      const descKey = String(c?.description || '').trim();
+      const key = `${dateKey}__${descKey}`;
+      const existing = byKey.get(key) || {
+        key,
+        date: c?.date,
+        description: c?.description || '',
+        ids: [] as number[],
+        raw: [] as any[],
+        cost: 0,
+        costJira: 0,
+        saving: 0,
+        costAvoidance: 0,
+        revenue: 0,
+      };
+
+      existing.ids.push(Number(c.id));
+      existing.raw.push(c);
+
+      const v = Number(c.totalValue ?? c.total_value) || 0;
+      if (c.type === 'Custo') existing.cost += v;
+      else if (c.type === 'Custo - Via Jira') existing.costJira += v;
+      else if (c.type === 'Saving') existing.saving += v;
+      else if (c.type === 'Cost Avoidance') existing.costAvoidance += v;
+      else if (c.type === 'Revenue') existing.revenue += v;
+
+      if (!existing.date && c?.date) existing.date = c.date;
+      if (!existing.description && c?.description) existing.description = c.description;
+      byKey.set(key, existing);
+    });
+
+    return Array.from(byKey.values()).sort((a, b) => {
+      const ta = new Date(a.date || '').getTime() || 0;
+      const tb = new Date(b.date || '').getTime() || 0;
+      return tb - ta;
+    });
+  }, [pc]);
+
+  const deleteCollectionGroup = async (ids: number[]) => {
+    if (!ids.length) return;
+    if (!confirm('Remover todas as coletas desta linha?')) return;
+    for (const id of ids) {
+      await deleteCollectionROI(id);
+    }
+  };
+
   return (
     <div className="animate-[fadeIn_0.2s_ease]">
       {/* Top bar */}
@@ -509,7 +561,7 @@ export function Projects() {
                 <Plus size={14} /> Nova Coleta
               </button>
             </div>
-            {pc.length === 0 ? (
+            {groupedCollections.length === 0 ? (
               <div className="text-center p-8 text-[var(--text-dim)] text-[13px]">
                 Nenhuma coleta ainda. Clique em "Nova Coleta" para começar.
               </div>
@@ -518,31 +570,32 @@ export function Projects() {
                 <table className="w-full border-collapse text-xs">
                   <thead>
                     <tr>
-                      {["Data","Descrição","Investimento","Saving","Custo Evitado","Receita","Total Retorno","ROI",""].map(h => (
+                      {["Data","Descrição","Investimento","Custo Jira","Saving","Custo Evitado","Receita","Total Retorno","ROI",""] .map(h => (
                         <th key={h} className="p-[9px_12px] text-left bg-[var(--surface-high)] text-[var(--text-dim)] font-bold text-[10px] uppercase tracking-[0.07em] border-b border-[var(--border)] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {[...pc].reverse().map(c => {
-                      const ts = c.type === 'Saving' ? c.totalValue : 0;
-                      const tce = c.type === 'Cost Avoidance' ? c.totalValue : 0;
-                      const tr = c.type === 'Revenue' ? c.totalValue : 0;
-                      const tot = ts + tce + tr; 
-                      const invC = c.type === 'Custo' ? c.totalValue : 0;
+                    {groupedCollections.map((g: any) => {
+                      const tot = (g.saving || 0) + (g.costAvoidance || 0) + (g.revenue || 0);
+                      const invC = (g.cost || 0) + (g.costJira || 0);
                       const roi = invC > 0 ? ((tot - invC) / invC) * 100 : null;
+                      const primary = g.raw?.find((r: any) => r.type === 'Custo - Via Jira')
+                        || g.raw?.find((r: any) => r.type === 'Custo')
+                        || g.raw?.[0];
                       return (
                         <tr
-                          key={c.id}
-                          onClick={() => openCollectionDetails(c)}
+                          key={g.key}
+                          onClick={() => primary && openCollectionDetails(primary)}
                           className="cursor-pointer hover:bg-[var(--surface-high)] transition-colors"
                         >
-                          <td className="p-[10px_12px] border-b border-[var(--border)] font-semibold text-[var(--text)]">{fmtDate(c.date)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--text-mid)]">{c.description || c.type}</td>
+                          <td className="p-[10px_12px] border-b border-[var(--border)] font-semibold text-[var(--text)]">{fmtDate(g.date)}</td>
+                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--text-mid)]">{g.description || (primary?.type || '')}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(invC)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--saving)]">{fmt(ts)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--custo-evitado)]">{fmt(tce)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--receita)]">{fmt(tr)}</td>
+                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(g.costJira || 0)}</td>
+                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--saving)]">{fmt(g.saving || 0)}</td>
+                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--custo-evitado)]">{fmt(g.costAvoidance || 0)}</td>
+                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--receita)]">{fmt(g.revenue || 0)}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--green)] font-semibold">{fmt(tot)}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)]">
                             <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: roi != null ? (roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)') : 'transparent', color: roi != null ? (roi >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-dim)' }}>
@@ -556,7 +609,7 @@ export function Projects() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  deleteCollectionROI(c.id);
+                                  deleteCollectionGroup(g.ids);
                                 }}
                               >
                                 <Trash2 size={13}/>
@@ -958,6 +1011,15 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
   const [step, setStep] = useState(0);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const [jiraLoading, setJiraLoading] = useState(false);
+  const [jiraError, setJiraError] = useState<string>('');
+  const [jiraStoryPoints, setJiraStoryPoints] = useState<number>(0);
+  const [jiraIssueCount, setJiraIssueCount] = useState<number>(0);
+  const [jiraNotEstimatedCount, setJiraNotEstimatedCount] = useState<number>(0);
+  const [jiraNotEstimatedList, setJiraNotEstimatedList] = useState<any[]>([]);
+  const [jiraVelocity, setJiraVelocity] = useState<number>(0);
+  const [jiraCostActive, setJiraCostActive] = useState(true);
+
   const defaultMethods = [
     { id: 'default-saving', name: 'Saving', type: 'Saving' },
     { id: 'default-ca', name: 'Custo Evitado', type: 'Cost Avoidance' },
@@ -985,6 +1047,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
 
   const steps = [
     { id: 'date', title: 'Data da Coleta' },
+    { id: 'jira-cost', title: 'Custo - Via Jira', type: 'Custo - Via Jira' },
     ...methods.map((m: any) => ({ id: m.id, title: m.name, type: m.type })),
     { id: 'confirm', title: 'Confirmação' }
   ];
@@ -1032,6 +1095,24 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
       }
     });
 
+    if (jiraCostActive && jiraEstimatedCost > 0) {
+      payloads.push({
+        type: 'Custo - Via Jira',
+        description: 'Custo Estimado via Jira',
+        totalValue: jiraEstimatedCost,
+        customData: {
+          active: true,
+          jiraKeys,
+          totalStoryPoints: jiraStoryPoints,
+          velocity: jiraVelocity,
+          baseCost: jiraCostBase,
+          costPerSp: jiraCostPerSp,
+          estimatedCost: jiraEstimatedCost,
+          notEstimatedCount: jiraNotEstimatedCount,
+        }
+      });
+    }
+
     const finalPayloads = payloads.map(p => ({ ...p, projectId: project.id, date }));
     onSaveMultiple(finalPayloads);
   };
@@ -1039,6 +1120,71 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
   const updateMethodData = (id: string, newData: any) => {
     setMethodsData(prev => ({ ...prev, [id]: { ...prev[id], ...newData } }));
   };
+
+  const jiraKeys = useMemo(() => {
+    const raw = String(project?.jiraLinks || '').trim();
+    if (!raw) return [] as string[];
+    return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+  }, [project?.jiraLinks]);
+
+  const jiraCostBase = 26000;
+  const jiraCostPerSp = useMemo(() => {
+    const v = Number(jiraVelocity) || 0;
+    if (v <= 0) return 0;
+    return jiraCostBase / v;
+  }, [jiraVelocity]);
+
+  const jiraEstimatedCost = useMemo(() => {
+    const sp = Number(jiraStoryPoints) || 0;
+    const rate = Number(jiraCostPerSp) || 0;
+    return sp > 0 && rate > 0 ? sp * rate : 0;
+  }, [jiraStoryPoints, jiraCostPerSp]);
+
+  useEffect(() => {
+    (async () => {
+      setJiraError('');
+      setJiraNotEstimatedList([]);
+      setJiraNotEstimatedCount(0);
+      setJiraStoryPoints(0);
+      setJiraIssueCount(0);
+
+      if (!jiraKeys.length) {
+        setJiraError('Sem chaves Jira vinculadas (cadastre em: Cadastro > Projeto > Linkar Projeto Jira).');
+        return;
+      }
+
+      setJiraLoading(true);
+      try {
+        const { data: velRow, error: velErr } = await supabase
+          .from('ops_sprints')
+          .select('velocity, date')
+          .order('date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (velErr) throw velErr;
+        const v = Number((velRow as any)?.velocity) || 0;
+        setJiraVelocity(v);
+
+        const { data, error } = await supabase.functions.invoke('jira-ops-sprints', {
+          body: {
+            action: 'spEstimateByKeys',
+            keys: jiraKeys
+          }
+        });
+        if (error) throw error;
+
+        setJiraStoryPoints(Number((data as any)?.totalStoryPoints) || 0);
+        setJiraIssueCount(Number((data as any)?.issueCount) || 0);
+        setJiraNotEstimatedCount(Number((data as any)?.notEstimatedCount) || 0);
+        setJiraNotEstimatedList(((data as any)?.notEstimated || []) as any[]);
+      } catch (e: any) {
+        setJiraError(e?.message || String(e));
+      } finally {
+        setJiraLoading(false);
+      }
+    })();
+  }, [jiraKeys.join(',')]);
 
   const renderForm = (m: any) => {
     const data = methodsData[m.id];

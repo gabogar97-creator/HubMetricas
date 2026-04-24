@@ -79,6 +79,7 @@ export interface Project {
   status: string;
   costFormula?: string;
   returnFormula?: string;
+  jiraLinks?: string;
   roiMethods?: RoiMethod[];
   CollectionROIs: CollectionROI[];
   NSMs: NSM[];
@@ -147,6 +148,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     formulaType: p.formula_type,
     costFormula: p.cost_formula,
     returnFormula: p.return_formula,
+    jiraLinks: p.jira_links,
     roiMethods: p.roi_methods,
     CollectionROIs: (p.collection_rois || p.CollectionROIs || []).map((r: any) => ({
       ...r,
@@ -523,6 +525,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status: data.status,
       cost_formula: data.costFormula,
       return_formula: data.returnFormula,
+      jira_links: data.jiraLinks,
       roi_methods: data.roiMethods
     };
     Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
@@ -545,6 +548,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status: data.status,
       cost_formula: data.costFormula,
       return_formula: data.returnFormula,
+      jira_links: data.jiraLinks,
       roi_methods: data.roiMethods
     };
     const { data: newProject, error } = await supabase

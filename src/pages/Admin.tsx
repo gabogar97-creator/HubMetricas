@@ -27,6 +27,7 @@ export function Admin() {
   const [projDate, setProjDate] = useState('');
   const [projCostFormula, setProjCostFormula] = useState('');
   const [projReturnFormula, setProjReturnFormula] = useState('');
+  const [projJiraLinks, setProjJiraLinks] = useState('');
   const [projRoiMethods, setProjRoiMethods] = useState<RoiMethod[]>([]);
   const [newMethodName, setNewMethodName] = useState('');
   const [newMethodType, setNewMethodType] = useState('Saving');
@@ -47,6 +48,7 @@ export function Admin() {
       goLiveDate: projDate || null,
       costFormula: projCostFormula || 'Horas × Valor da Hora (ou definido manualmente)',
       returnFormula: projReturnFormula || 'Quantidade × Horas × Valor da Hora',
+      jiraLinks: projJiraLinks,
       roiMethods: projRoiMethods
     };
 
@@ -56,7 +58,7 @@ export function Admin() {
       await addProject(data);
     }
     
-    setProjName(''); setProjDate(''); setProjCostFormula(''); setProjReturnFormula(''); setProjRoiMethods([]); setEditingProjectId(null);
+    setProjName(''); setProjDate(''); setProjCostFormula(''); setProjReturnFormula(''); setProjJiraLinks(''); setProjRoiMethods([]); setEditingProjectId(null);
     await refreshData();
   };
 
@@ -66,6 +68,7 @@ export function Admin() {
     setProjDate(p.goLiveDate ? p.goLiveDate.split('T')[0] : '');
     setProjCostFormula(p.costFormula || '');
     setProjReturnFormula(p.returnFormula || '');
+    setProjJiraLinks(p.jiraLinks || '');
     setProjRoiMethods(p.roiMethods || []);
   };
 
@@ -169,6 +172,9 @@ export function Admin() {
                 <FormGroup label="Data Go-Live" type="date" value={projDate} onChange={(e: any) => setProjDate(e.target.value)} />
               </div>
               <div className="grid grid-cols-1 gap-4">
+                <FormGroup label="Linkar Projeto Jira" placeholder='Ex: IA-1, IA-2' value={projJiraLinks} onChange={(e: any) => setProjJiraLinks(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 gap-4">
                 <FormGroup label="Fórmula de Custo" placeholder="Ex: Horas × Valor da Hora" value={projCostFormula} onChange={(e: any) => setProjCostFormula(e.target.value)} />
                 <FormGroup label="Fórmula de Retorno" placeholder="Ex: Quantidade × Horas × Valor da Hora" value={projReturnFormula} onChange={(e: any) => setProjReturnFormula(e.target.value)} />
               </div>
@@ -264,7 +270,7 @@ export function Admin() {
                 {editingProjectId && (
                   <button onClick={() => {
                     setEditingProjectId(null);
-                    setProjName(''); setProjDate(''); setProjCostFormula(''); setProjReturnFormula(''); setProjRoiMethods([]);
+                    setProjName(''); setProjDate(''); setProjCostFormula(''); setProjReturnFormula(''); setProjJiraLinks(''); setProjRoiMethods([]);
                   }} className="px-4 py-2.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors">
                     Cancelar
                   </button>
