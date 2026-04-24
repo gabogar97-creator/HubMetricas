@@ -1019,6 +1019,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
   const [jiraNotEstimatedList, setJiraNotEstimatedList] = useState<any[]>([]);
   const [jiraVelocity, setJiraVelocity] = useState<number>(0);
   const [jiraCostActive, setJiraCostActive] = useState(true);
+  const [jiraCostBase, setJiraCostBase] = useState<number>(26000);
 
   const defaultMethods = [
     { id: 'default-saving', name: 'Saving', type: 'Saving' },
@@ -1044,16 +1045,6 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
     });
     return initial;
   });
-
-  const steps = [
-    { id: 'date', title: 'Data da Coleta' },
-    { id: 'jira-cost', title: 'Custo - Via Jira', type: 'Custo - Via Jira' },
-    ...methods.map((m: any) => ({ id: m.id, title: m.name, type: m.type })),
-    { id: 'confirm', title: 'Confirmação' }
-  ];
-
-  const handleNext = () => setStep(s => Math.min(s + 1, steps.length - 1));
-  const handlePrev = () => setStep(s => Math.max(s - 1, 0));
 
   const calculateTotal = (m: any, data: any) => {
     if (!m.formula || m.formula.length === 0) return data.manual || 0;
@@ -1127,12 +1118,13 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
     return raw.split(',').map((s: string) => s.trim()).filter(Boolean);
   }, [project?.jiraLinks]);
 
-  const jiraCostBase = 26000;
+  const hasJiraLinks = jiraKeys.length > 0;
+
   const jiraCostPerSp = useMemo(() => {
     const v = Number(jiraVelocity) || 0;
     if (v <= 0) return 0;
     return jiraCostBase / v;
-  }, [jiraVelocity]);
+  }, [jiraCostBase, jiraVelocity]);
 
   const jiraEstimatedCost = useMemo(() => {
     const sp = Number(jiraStoryPoints) || 0;
@@ -1140,8 +1132,21 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
     return sp > 0 && rate > 0 ? sp * rate : 0;
   }, [jiraStoryPoints, jiraCostPerSp]);
 
+  const steps = useMemo(() => {
+    const base = [{ id: 'date', title: 'Data da Coleta' }];
+    const jiraStep = hasJiraLinks ? [{ id: 'jira-cost', title: 'Custo - Via Jira', type: 'Custo - Via Jira' }] : [];
+    const methodSteps = methods.map((m: any) => ({ id: m.id, title: m.name, type: m.type }));
+    return [...base, ...jiraStep, ...methodSteps, { id: 'confirm', title: 'Confirmação' }];
+  }, [hasJiraLinks, methods]);
+
+  const handleNext = () => setStep(s => Math.min(s + 1, steps.length - 1));
+  const handlePrev = () => setStep(s => Math.max(s - 1, 0));
+
   useEffect(() => {
     (async () => {
+      const current = steps[step];
+      if (!current || current.id !== 'jira-cost') return;
+
       setJiraError('');
       setJiraNotEstimatedList([]);
       setJiraNotEstimatedCount(0);
@@ -1164,13 +1169,13 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
 
         if (velErr) throw velErr;
         const v = Number((velRow as any)?.velocity) || 0;
-        setJiraVelocity(v);
+        setJiraVelocity((prev) => (prev > 0 ? prev : v * 2));
 
         const { data, error } = await supabase.functions.invoke('jira-ops-sprints', {
           body: {
             action: 'spEstimateByKeys',
-            keys: jiraKeys
-          }
+            keys: jiraKeys,
+          },
         });
         if (error) throw error;
 
@@ -1184,7 +1189,86 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
         setJiraLoading(false);
       }
     })();
-  }, [jiraKeys.join(',')]);
+  }, [step, steps, jiraKeys.join(',')]);
+
+  const renderJiraCostTab = () => {
+    return (
+      <div className="space-y-4 animate-[fadeIn_0.2s_ease]">
+        <label className="flex items-center gap-2 cursor-pointer p-3 bg-[var(--surface-high)] rounded-lg border border-[var(--border)] hover:border-[var(--red)] transition-colors">
+          <input
+            type="checkbox"
+            checked={jiraCostActive}
+            onChange={e => setJiraCostActive(e.target.checked)}
+            className="w-4 h-4 accent-[var(--red)]"
+          />
+          <span className="text-[13px] font-medium text-[var(--text)]">Registrar Custo estimado via Jira nesta data?</span>
+        </label>
+
+        <div className="bg-[var(--surface-high)] rounded-lg p-4 border border-[var(--border)]">
+          <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Consulta Jira</div>
+          <div className="text-[12px] text-[var(--text-mid)]">Chaves vinculadas: <span className="font-mono text-[var(--text)]">{jiraKeys.length ? jiraKeys.join(', ') : '—'}</span></div>
+          {jiraLoading ? (
+            <div className="text-[12px] text-[var(--text-dim)] mt-2">Carregando story points (somente concluídas)...</div>
+          ) : jiraError ? (
+            <div className="text-[12px] text-[var(--red)] mt-2">{jiraError}</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 text-[12px]">
+              <div className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-3">
+                <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Issues concluídas</div>
+                <div className="text-[14px] font-mono font-bold text-[var(--text)]">{jiraIssueCount}</div>
+              </div>
+              <div className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-3">
+                <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Total Story Points Estimado</div>
+                <div className="text-[14px] font-mono font-bold text-[var(--text)]">{jiraStoryPoints}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-[var(--surface-high)] rounded-lg p-4 border border-[var(--border)]">
+          <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Parâmetros</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-[0.07em] mb-1.5">Velocity (última * 2)</label>
+              <input
+                type="number"
+                value={jiraVelocity}
+                onChange={e => setJiraVelocity(Number(e.target.value) || 0)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--red)]"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-[var(--text-mid)] uppercase tracking-[0.07em] mb-1.5">Custo mensal do squad</label>
+              <input
+                type="number"
+                value={jiraCostBase}
+                onChange={e => setJiraCostBase(Number(e.target.value) || 0)}
+                className="w-full bg-[var(--surface-high)] border border-[var(--border)] rounded-lg px-3 py-2 text-[13px] text-[var(--text)] focus:outline-none focus:border-[var(--red)]"
+              />
+            </div>
+          </div>
+          <div className="mt-3 text-[12px] text-[var(--text-mid)]">
+            Custo/SP: <span className="font-mono text-[var(--text)]">{jiraCostPerSp ? fmt(jiraCostPerSp) : '—'}</span>
+          </div>
+        </div>
+
+        <div className="bg-[var(--surface-high)] rounded-lg p-4 border border-[var(--border)]">
+          <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Total calculado</div>
+          <div className="text-[12px] text-[var(--text-mid)] font-mono whitespace-pre-wrap">
+            {`(custoSquad / velocity) * SP_total\n` +
+              `= (${jiraCostBase} / ${Number(jiraVelocity) || 0}) * ${Number(jiraStoryPoints) || 0}\n` +
+              `= ${(jiraCostPerSp || 0).toFixed(2)} * ${Number(jiraStoryPoints) || 0}\n` +
+              `= ${fmt(jiraEstimatedCost)}`}
+          </div>
+          {jiraNotEstimatedCount > 0 && (
+            <div className="mt-3 text-[12px] text-[var(--yellow)]">
+              {jiraNotEstimatedCount} issue(s) concluída(s) sem story points (não entram na soma).
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderForm = (m: any) => {
     const data = methodsData[m.id];
@@ -1261,7 +1345,12 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
             </div>
           )}
 
-          {step > 0 && step < steps.length - 1 && renderForm(methods[step - 1])}
+          {step > 0 && step < steps.length - 1 && steps[step].id === 'jira-cost' && renderJiraCostTab()}
+
+          {step > 0 && step < steps.length - 1 && steps[step].id !== 'jira-cost' && (() => {
+            const m = methods.find((mm: any) => mm.id === steps[step].id);
+            return m ? renderForm(m) : null;
+          })()}
 
           {step === steps.length - 1 && (
             <div className="space-y-4 animate-[fadeIn_0.2s_ease]">
@@ -1278,9 +1367,16 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
                       <div className="text-base font-extrabold" style={{ color: data.active ? col : 'var(--text-dim)' }}>{data.active ? fmt(calculateTotal(m, data)) : '—'}</div>
                     </div>
                   )})}
+
+                  {hasJiraLinks && jiraCostActive && (
+                    <div className="bg-[var(--bg)] rounded-lg p-[10px_12px]">
+                      <div className="text-[10px] text-[var(--text-dim)] mb-[3px] uppercase font-semibold">Custo - Via Jira</div>
+                      <div className="text-base font-extrabold" style={{ color: 'var(--red)' }}>{fmt(jiraEstimatedCost)}</div>
+                    </div>
+                  )}
                 </div>
               </div>
-              {!methods.some((m: any) => methodsData[m.id].active) && (
+              {!methods.some((m: any) => methodsData[m.id].active) && !(hasJiraLinks && jiraCostActive && jiraEstimatedCost > 0) && (
                 <div className="text-[13px] text-[var(--red)] bg-[rgba(244,63,94,0.1)] p-3 rounded-lg border border-[rgba(244,63,94,0.2)]">
                   Atenção: Nenhum valor foi preenchido. Nada será salvo.
                 </div>
@@ -1310,7 +1406,7 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
             <button 
               type="button" 
               onClick={handleSubmit} 
-              disabled={!methods.some((m: any) => methodsData[m.id].active)}
+              disabled={!methods.some((m: any) => methodsData[m.id].active) && !(hasJiraLinks && jiraCostActive && jiraEstimatedCost > 0)}
               className="bg-[var(--green)] text-white px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save size={13} /> Salvar Coleta

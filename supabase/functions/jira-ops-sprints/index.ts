@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
       }
 
       const quoted = keys.map((k) => `"${k.replace(/\"/g, '')}"`).join(',');
-      const jql = `("Epic Link" in (${quoted}) OR parent in (${quoted}))`;
+      const jql = `(("Epic Link" in (${quoted}) OR parent in (${quoted})) AND statusCategory = Done)`;
       const fields = ['key', 'summary', 'status', 'customfield_10016'].join(',');
       const maxResults = 100;
       let startAt = 0;
