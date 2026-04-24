@@ -33,6 +33,7 @@ export interface NSM {
 
 export interface CollectionROI {
   id: number;
+  collectionBatchId?: string;
   projectId: number;
   date: string;
   type: string;
@@ -152,6 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     roiMethods: p.roi_methods,
     CollectionROIs: (p.collection_rois || p.CollectionROIs || []).map((r: any) => ({
       ...r,
+      collectionBatchId: r.collection_batch_id,
       projectId: r.project_id,
       accumulatedQuantity: r.accumulated_quantity,
       hourlyRate: r.hourly_rate,
@@ -568,6 +570,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateCollectionROI = async (id: number, data: any) => {
     const payload: any = {
+      collection_batch_id: data.collectionBatchId,
       date: data.date,
       type: data.type,
       description: data.description,
@@ -625,6 +628,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       date: data.date,
       type: data.type,
       description: data.description,
+      collection_batch_id: data.collectionBatchId,
       accumulated_quantity: data.accumulatedQuantity,
       hours: data.hours,
       hourly_rate: data.hourlyRate,

@@ -310,10 +310,12 @@ export function Projects() {
 
     rows.forEach((c: any) => {
       const dateKey = (c?.date || '').split('T')[0];
-      const key = `${dateKey}`;
+      const bid = c?.collectionBatchId ?? c?.collection_batch_id;
+      const key = bid ? String(bid) : `${dateKey}`;
       const existing = byKey.get(key) || {
         key,
         date: c?.date,
+        collectionBatchId: bid || null,
         ids: [] as number[],
         raw: [] as any[],
         cost: 0,
@@ -1068,6 +1070,9 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const payloads: any[] = [];
+    const collectionBatchId = (globalThis as any)?.crypto?.randomUUID
+      ? (globalThis as any).crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     
     methods.forEach((m: any) => {
       const data = methodsData[m.id];
@@ -1077,7 +1082,8 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
           type: m.type,
           description: data.desc || m.name,
           totalValue: total,
-          customData: data
+          customData: data,
+          collectionBatchId
         });
       }
     });
@@ -1096,7 +1102,8 @@ function CollectionWizard({ project, onClose, onSaveMultiple }: any) {
           costPerSp: jiraCostPerSp,
           estimatedCost: jiraEstimatedCost,
           notEstimatedCount: jiraNotEstimatedCount,
-        }
+        },
+        collectionBatchId
       });
     }
 
