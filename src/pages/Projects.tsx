@@ -22,10 +22,14 @@ export function Projects() {
   console.log('Starting Projects component render...');
   console.log('Projects component rendering...');
   console.log('Rendering Projects...');
-  const { projects, deleteCollectionROI, refreshData, addCollectionNSM, addCollectionROI } = useAppContext();
+  const { projects, deleteCollectionROI, refreshData, addCollectionNSM, addCollectionROI, updateCollectionROI } = useAppContext();
   const [selId, setSelId] = useState<number | null>(null);
   const [wizard, setWizard] = useState(false);
   const [nsmWizard, setNsmWizard] = useState(false);
+  const [selectedCollection, setSelectedCollection] = useState<any | null>(null);
+  const [isEditingCollection, setIsEditingCollection] = useState(false);
+  const [collectionDraft, setCollectionDraft] = useState<any | null>(null);
+  const [isSavingCollection, setIsSavingCollection] = useState(false);
   const location = useLocation();
 
   const getLatestAccumulatedValue = (rows: any[], type: string) => {
@@ -53,6 +57,115 @@ export function Projects() {
   }, [projects, selId, location.search]);
 
   const project = projects.find(p => p.id === selId);
+
+  const defaultRoiMethods = useMemo(() => ([
+    { id: 'default-saving', name: 'Saving', type: 'Saving' },
+    { id: 'default-ca', name: 'Custo Evitado', type: 'Cost Avoidance' },
+    { id: 'default-rev', name: 'Receita', type: 'Revenue' },
+    { id: 'default-cost', name: 'Custo', type: 'Custo' }
+  ]), []);
+
+  const normalizeCustomData = (c: any) => {
+    const cd = c?.customData ?? c?.custom_data;
+    if (cd && typeof cd === 'object') return cd;
+    return null;
+  };
+
+  const buildFormulaString = (m: any) => {
+    if (!m?.formula || !Array.isArray(m.formula) || m.formula.length === 0) return '';
+    return m.formula
+      .map((p: any) => {
+        if (p?.type === 'field') {
+          const field = m.fields?.find((f: any) => f.id === p.value || f.name === p.value);
+          return field?.name || String(p.value);
+        }
+        return String(p?.value ?? '');
+      })
+      .join(' ')
+      .trim();
+  };
+
+  const buildCalcTrace = (m: any, data: any) => {
+    if (!m?.formula || !Array.isArray(m.formula) || m.formula.length === 0) return null;
+    let total = 0;
+    let currentOperator = '+';
+    const steps: any[] = [];
+
+    m.formula.forEach((part: any) => {
+      if (part?.type === 'field') {
+        const field = m.fields?.find((f: any) => f.id === part.value || f.name === part.value);
+        const raw = field ? data?.[field.id] : data?.[part.value];
+        const value = Number(raw) || 0;
+        const prev = total;
+        if (currentOperator === '+') total += value;
+        else if (currentOperator === '-') total -= value;
+        else if (currentOperator === '*') total *= value;
+        else if (currentOperator === '/') total /= value;
+        steps.push({
+          op: currentOperator,
+          label: field?.name || String(part.value),
+          value,
+          prev,
+          next: total
+        });
+      } else {
+        currentOperator = part?.value;
+      }
+    });
+
+    return { total, steps };
+  };
+
+  const openCollectionDetails = (c: any) => {
+    setSelectedCollection(c);
+    setIsEditingCollection(false);
+    setCollectionDraft(null);
+  };
+
+  const startEditCollection = (c: any) => {
+    const cd = normalizeCustomData(c);
+    setIsEditingCollection(true);
+    setCollectionDraft({
+      id: c?.id,
+      projectId: project?.id,
+      date: (c?.date || '').split('T')[0],
+      type: c?.type,
+      description: c?.description ?? '',
+      accumulatedQuantity: c?.accumulatedQuantity ?? 0,
+      hours: c?.hours ?? 0,
+      hourlyRate: c?.hourlyRate ?? 0,
+      totalValue: c?.totalValue ?? 0,
+      customData: cd ? { ...cd } : null
+    });
+  };
+
+  const cancelEditCollection = () => {
+    setIsEditingCollection(false);
+    setCollectionDraft(null);
+  };
+
+  const saveEditCollection = async () => {
+    if (!collectionDraft?.id) return;
+    setIsSavingCollection(true);
+    try {
+      await updateCollectionROI(Number(collectionDraft.id), {
+        date: collectionDraft.date,
+        type: collectionDraft.type,
+        description: collectionDraft.description,
+        accumulatedQuantity: Number(collectionDraft.accumulatedQuantity) || 0,
+        hours: Number(collectionDraft.hours) || 0,
+        hourlyRate: Number(collectionDraft.hourlyRate) || 0,
+        totalValue: Number(collectionDraft.totalValue) || 0,
+        customData: collectionDraft.customData
+      });
+      setSelectedCollection(null);
+      cancelEditCollection();
+    } catch (e) {
+      console.error('Failed to update collection:', e);
+    } finally {
+      setIsSavingCollection(false);
+    }
+  };
 
   const {
     totalInvestment,
@@ -409,7 +522,11 @@ export function Projects() {
                       const invC = c.type === 'Custo' ? c.totalValue : 0;
                       const roi = invC > 0 ? ((tot - invC) / invC) * 100 : null;
                       return (
-                        <tr key={c.id}>
+                        <tr
+                          key={c.id}
+                          onClick={() => openCollectionDetails(c)}
+                          className="cursor-pointer hover:bg-[var(--surface-high)] transition-colors"
+                        >
                           <td className="p-[10px_12px] border-b border-[var(--border)] font-semibold text-[var(--text)]">{fmtDate(c.date)}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--text-mid)]">{c.description || c.type}</td>
                           <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(invC)}</td>
@@ -424,7 +541,16 @@ export function Projects() {
                           </td>
                           <td className="p-[10px_12px] border-b border-[var(--border)]">
                             <div className="flex gap-1.5">
-                              <button className="bg-transparent border-none text-[var(--red)] cursor-pointer p-1 hover:opacity-80" onClick={() => deleteCollectionROI(c.id)}><Trash2 size={13}/></button>
+                              <button
+                                className="bg-transparent border-none text-[var(--red)] cursor-pointer p-1 hover:opacity-80"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  deleteCollectionROI(c.id);
+                                }}
+                              >
+                                <Trash2 size={13}/>
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -464,6 +590,211 @@ export function Projects() {
             setNsmWizard(false);
           }}
         />
+      )}
+
+      {selectedCollection && project && (
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+          <div className="glass-card w-full max-w-[980px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <div className="flex justify-between items-center p-[20px_22px] sm:p-[24px_26px] border-b border-[var(--border)] shrink-0 bg-[var(--surface)] sticky top-0 z-10">
+              <div>
+                <h3 className="m-0 text-[15px] font-bold">Detalhes da Coleta — {project.name}</h3>
+                <div className="text-[11px] text-[var(--text-dim)] mt-1">{fmtDate(selectedCollection.date)} · {selectedCollection.description || selectedCollection.type}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {!isEditingCollection ? (
+                  <button
+                    onClick={() => startEditCollection(selectedCollection)}
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                  >
+                    Editar
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={saveEditCollection}
+                      disabled={isSavingCollection}
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[var(--accent)] text-white hover:bg-[#33ddff] transition-colors disabled:opacity-60"
+                    >
+                      Salvar
+                    </button>
+                    <button
+                      onClick={cancelEditCollection}
+                      disabled={isSavingCollection}
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors disabled:opacity-60"
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedCollection(null);
+                    cancelEditCollection();
+                  }}
+                  className="bg-transparent border-none text-[var(--text-dim)] cursor-pointer hover:text-[var(--text)]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-[20px_22px] sm:p-[24px_26px]">
+              {(() => {
+                const methods = (project.roiMethods && project.roiMethods.length > 0) ? project.roiMethods : defaultRoiMethods;
+                const current = isEditingCollection && collectionDraft ? collectionDraft : selectedCollection;
+                const m = methods.find((x: any) => x.type === current.type);
+                const cd = isEditingCollection && collectionDraft ? collectionDraft.customData : normalizeCustomData(selectedCollection);
+                const formulaStr = buildFormulaString(m);
+                const trace = cd && m ? buildCalcTrace(m, cd) : null;
+                const storedTotal = Number(current.totalValue ?? current.total_value) || 0;
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
+                    <div className="bg-[var(--surface-high)] rounded-lg p-4 border border-[var(--border)]">
+                      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Valores da coleta</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
+                        <div>
+                          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Tipo</div>
+                          <div className="text-[var(--text)] font-semibold">{current.type}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Total salvo</div>
+                          {isEditingCollection ? (
+                            <input
+                              type="number"
+                              value={collectionDraft?.totalValue ?? 0}
+                              onChange={(e) => setCollectionDraft((d: any) => ({ ...(d || {}), totalValue: e.target.value }))}
+                              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-right font-mono text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                            />
+                          ) : (
+                            <div className="text-[var(--green)] font-mono font-bold">{fmt(storedTotal)}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px] mt-3">
+                        <div>
+                          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Data</div>
+                          {isEditingCollection ? (
+                            <input
+                              type="date"
+                              value={collectionDraft?.date ?? ''}
+                              onChange={(e) => setCollectionDraft((d: any) => ({ ...(d || {}), date: e.target.value }))}
+                              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                            />
+                          ) : (
+                            <div className="text-[var(--text)] font-semibold">{fmtDate(selectedCollection.date)}</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Descrição</div>
+                          {isEditingCollection ? (
+                            <input
+                              value={collectionDraft?.description ?? ''}
+                              onChange={(e) => setCollectionDraft((d: any) => ({ ...(d || {}), description: e.target.value }))}
+                              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                            />
+                          ) : (
+                            <div className="text-[var(--text)] font-semibold">{selectedCollection.description || selectedCollection.type}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">Detalhamento (customData)</div>
+                        {cd ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {Object.entries(cd)
+                              .filter(([k]) => k !== 'active')
+                              .map(([k, v]) => (
+                                <div key={k} className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-2">
+                                  <div className="text-[10px] text-[var(--text-dim)] font-mono">{k}</div>
+                                  {isEditingCollection ? (
+                                    <input
+                                      value={String(v ?? '')}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setCollectionDraft((d: any) => ({
+                                          ...(d || {}),
+                                          customData: { ...((d && d.customData) ? d.customData : {}), [k]: val }
+                                        }));
+                                      }}
+                                      className="w-full bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-[var(--text)] font-mono outline-none focus:border-[var(--accent)]"
+                                    />
+                                  ) : (
+                                    <div className="text-[12px] text-[var(--text)] font-mono truncate">{typeof v === 'number' ? Number(v).toLocaleString() : String(v ?? '')}</div>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-[var(--text-dim)]">Esta coleta não possui customData salvo.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-[var(--surface-high)] rounded-lg p-4 border border-[var(--border)]">
+                      <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em] mb-3">Fórmula e cálculo</div>
+                      {m ? (
+                        <>
+                          <div className="text-[12px] text-[var(--text)] font-semibold mb-2">Método: {m.name || selectedCollection.type}</div>
+                          <div className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-3">
+                            <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-1">Fórmula</div>
+                            <div className="text-[12px] text-[var(--text)] font-mono whitespace-pre-wrap">{formulaStr || 'Valor manual (sem fórmula cadastrada)'}</div>
+                          </div>
+
+                          {trace ? (
+                            <div className="mt-3">
+                              <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider mb-2">Passo a passo</div>
+                              <div className="max-h-[260px] overflow-y-auto border border-[var(--border)] rounded-md">
+                                <table className="w-full text-[11px]">
+                                  <thead className="sticky top-0 bg-[var(--surface-high)] text-[var(--text-dim)]">
+                                    <tr>
+                                      <th className="p-2 text-left font-semibold">Op</th>
+                                      <th className="p-2 text-left font-semibold">Campo</th>
+                                      <th className="p-2 text-right font-semibold">Valor</th>
+                                      <th className="p-2 text-right font-semibold">Antes</th>
+                                      <th className="p-2 text-right font-semibold">Depois</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[var(--border)]">
+                                    {trace.steps.map((s: any, i: number) => (
+                                      <tr key={i}>
+                                        <td className="p-2 font-mono text-[var(--text-mid)]">{s.op}</td>
+                                        <td className="p-2 text-[var(--text)]">{s.label}</td>
+                                        <td className="p-2 text-right font-mono text-[var(--text)]">{Number(s.value).toLocaleString()}</td>
+                                        <td className="p-2 text-right font-mono text-[var(--text-mid)]">{Number(s.prev).toLocaleString()}</td>
+                                        <td className="p-2 text-right font-mono font-semibold text-[var(--green)]">{Number(s.next).toLocaleString()}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-3">
+                                  <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Total recalculado</div>
+                                  <div className="text-[14px] font-mono font-bold text-[var(--text)]">{fmt(Number(trace.total) || 0)}</div>
+                                </div>
+                                <div className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-3">
+                                  <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">Total salvo</div>
+                                  <div className="text-[14px] font-mono font-bold text-[var(--text)]">{fmt(storedTotal)}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 text-[12px] text-[var(--text-dim)]">Não foi possível recalcular: faltam campos em customData ou fórmula.</div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-[12px] text-[var(--text-dim)]">Não encontrei um método/fórmula para o tipo <span className="font-mono text-[var(--text)]">{selectedCollection.type}</span>. Mostrando apenas os valores salvos.</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
