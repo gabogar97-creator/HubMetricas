@@ -311,8 +311,8 @@ Deno.serve(async (req) => {
         return jsonResponse(200, { totalStoryPoints: 0, issueCount: 0, notEstimatedCount: 0, notEstimated: [] });
       }
 
-      const quoted = keys.map((k) => `"${k.replace(/\"/g, '')}"`).join(',');
-      const jql = `(("Epic Link" in (${quoted}) OR parent in (${quoted})) AND statusCategory = Done)`;
+      const list = keys.map((k) => k.replace(/\s+/g, '').replace(/\"/g, '')).join(',');
+      const jql = `(parent in (${list}) AND statusCategory = Done) ORDER BY created DESC`;
       const fields = ['key', 'summary', 'status', 'customfield_10016'].join(',');
       const maxResults = 100;
       let startAt = 0;
