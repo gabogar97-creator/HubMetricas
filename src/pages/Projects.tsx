@@ -116,6 +116,16 @@ export function Projects() {
     return { total, steps };
   };
 
+  const getCustomFieldLabel = (m: any, key: string) => {
+    const field = m?.fields?.find((f: any) => String(f.id) === String(key) || String(f.name) === String(key));
+    return field?.name || key;
+  };
+
+  const getCustomFieldKeyForData = (m: any, key: string) => {
+    const field = m?.fields?.find((f: any) => String(f.id) === String(key) || String(f.name) === String(key));
+    return field?.id || key;
+  };
+
   const openCollectionDetails = (c: any) => {
     setSelectedCollection(c);
     setIsEditingCollection(false);
@@ -647,6 +657,14 @@ export function Projects() {
                 const formulaStr = buildFormulaString(m);
                 const trace = cd && m ? buildCalcTrace(m, cd) : null;
                 const storedTotal = Number(current.totalValue ?? current.total_value) || 0;
+                const hasFormula = !!(m?.formula && Array.isArray(m.formula) && m.formula.length > 0);
+                const effectiveTotal = hasFormula && trace ? Number(trace.total) || 0 : storedTotal;
+
+                if (isEditingCollection && hasFormula && trace && collectionDraft && Number(collectionDraft.totalValue ?? 0) !== effectiveTotal) {
+                  queueMicrotask(() => {
+                    setCollectionDraft((d: any) => (d ? { ...d, totalValue: effectiveTotal } : d));
+                  });
+                }
 
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
@@ -664,10 +682,11 @@ export function Projects() {
                               type="number"
                               value={collectionDraft?.totalValue ?? 0}
                               onChange={(e) => setCollectionDraft((d: any) => ({ ...(d || {}), totalValue: e.target.value }))}
-                              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-right font-mono text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                              disabled={hasFormula}
+                              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-right font-mono text-[var(--text)] outline-none focus:border-[var(--accent)] disabled:opacity-70"
                             />
                           ) : (
-                            <div className="text-[var(--green)] font-mono font-bold">{fmt(storedTotal)}</div>
+                            <div className="text-[var(--green)] font-mono font-bold">{fmt(effectiveTotal)}</div>
                           )}
                         </div>
                       </div>
@@ -708,7 +727,7 @@ export function Projects() {
                               .filter(([k]) => k !== 'active')
                               .map(([k, v]) => (
                                 <div key={k} className="bg-[var(--bg)] rounded-md border border-[var(--border)] p-2">
-                                  <div className="text-[10px] text-[var(--text-dim)] font-mono">{k}</div>
+                                  <div className="text-[10px] text-[var(--text-dim)] font-mono">{getCustomFieldLabel(m, k)}</div>
                                   {isEditingCollection ? (
                                     <input
                                       value={String(v ?? '')}
@@ -716,7 +735,7 @@ export function Projects() {
                                         const val = e.target.value;
                                         setCollectionDraft((d: any) => ({
                                           ...(d || {}),
-                                          customData: { ...((d && d.customData) ? d.customData : {}), [k]: val }
+                                          customData: { ...((d && d.customData) ? d.customData : {}), [getCustomFieldKeyForData(m, k)]: val }
                                         }));
                                       }}
                                       className="w-full bg-transparent border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-[var(--text)] font-mono outline-none focus:border-[var(--accent)]"
