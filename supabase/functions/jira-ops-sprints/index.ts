@@ -321,21 +321,13 @@ Deno.serve(async (req) => {
       const notEstimated: any[] = [];
 
       while (true) {
-        const url = `https://zucchettibr.atlassian.net/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=${maxResults}&startAt=${startAt}`;
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Basic ${auth}`,
-            Accept: 'application/json'
-          }
-        });
-
+        const url = `${JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=${maxResults}&startAt=${startAt}`;
+        const res = await fetchJira(url);
         if (!res.ok) {
-          const t = await res.text();
-          return jsonResponse(500, { error: `Jira request failed: ${res.status}`, details: t });
+          return jsonResponse(res.status, { error: `Jira request failed: ${res.status}`, details: res.details });
         }
 
-        const json: any = await res.json();
+        const json: any = res.json as any;
         const issues = (json?.issues || []) as JiraSearchIssue[];
 
         issues.forEach((iss: any) => {
