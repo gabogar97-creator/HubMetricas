@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { format, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChartBar, Target, Plus, X, Trash2 } from 'lucide-react';
+import { ChartBar, Target, Plus, X, Trash2, Pencil, Check } from 'lucide-react';
 
 const fmt = (n: number | null) => n == null || isNaN(n) ? "R$ —" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 const fmtShort = (n: number | null) => { if (n == null || isNaN(n)) return "—"; const a = Math.abs(n); if (a >= 1e6) return `R$ ${(n/1e6).toFixed(1)}M`; if (a >= 1e3) return `R$ ${(n/1e3).toFixed(1)}K`; return fmt(n); };
@@ -18,6 +18,8 @@ export function Dashboard() {
     projects,
     refreshData,
     addCollectionNSM,
+    updateCollectionNSM,
+    deleteCollectionNSM,
     addOKR,
     addOkrKeyResult,
     updateOkrKeyResult,
@@ -38,6 +40,10 @@ export function Dashboard() {
   const [isOkrModalOpen, setIsOkrModalOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<any | null>(null);
   const [collectingKr, setCollectingKr] = useState<any | null>(null);
+  const [editingNsmCollectionId, setEditingNsmCollectionId] = useState<number | null>(null);
+  const [editingNsmCollectionDate, setEditingNsmCollectionDate] = useState<string>('');
+  const [editingNsmCollectionValue, setEditingNsmCollectionValue] = useState<string>('');
+  const [isSavingNsmCollection, setIsSavingNsmCollection] = useState(false);
   const navigate = useNavigate();
 
   const envJiraEmail = import.meta.env.VITE_JIRA_EMAIL as string | undefined;
@@ -377,6 +383,45 @@ export function Dashboard() {
     });
     return list;
   }, [projects]);
+
+  const startEditNsmCollection = (h: any) => {
+    if (h?.id == null) return;
+    setEditingNsmCollectionId(Number(h.id));
+    setEditingNsmCollectionDate((h?.date || '').split('T')[0]);
+    setEditingNsmCollectionValue(h?.value ?? '');
+  };
+
+  const cancelEditNsmCollection = () => {
+    setEditingNsmCollectionId(null);
+    setEditingNsmCollectionDate('');
+    setEditingNsmCollectionValue('');
+  };
+
+  const saveEditNsmCollection = async () => {
+    if (editingNsmCollectionId == null) return;
+    setIsSavingNsmCollection(true);
+    try {
+      await updateCollectionNSM(editingNsmCollectionId, {
+        date: editingNsmCollectionDate,
+        value: editingNsmCollectionValue
+      });
+      cancelEditNsmCollection();
+    } catch (e) {
+      console.error('Failed to update NSM collection:', e);
+    } finally {
+      setIsSavingNsmCollection(false);
+    }
+  };
+
+  const onDeleteNsmCollection = async (id: number) => {
+    if (!window.confirm('Remover este item de coleta?')) return;
+    try {
+      await deleteCollectionNSM(id);
+      if (editingNsmCollectionId === id) cancelEditNsmCollection();
+    } catch (e) {
+      console.error('Failed to delete NSM collection:', e);
+    }
+  };
 
   const { okrs } = useAppContext();
   const allOkrs = useMemo(() => okrs || [], [okrs]);
@@ -1068,17 +1113,80 @@ export function Dashboard() {
                               <tr>
                                 <th className="py-1 font-medium">Data</th>
                                 <th className="py-1 font-medium text-right">Valor</th>
+                                <th className="py-1 font-medium text-right">Ações</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border)]">
                               {m.history.map((h: any, idx: number) => (
-                                <tr key={idx}>
+                                <tr key={h?.id ?? idx}>
                                   <td className="py-1 text-[var(--text-mid)]">
-                                    {h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime()) 
-                                      ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
-                                      : '-'}
+                                    {editingNsmCollectionId === Number(h?.id) ? (
+                                      <input
+                                        type="date"
+                                        value={editingNsmCollectionDate}
+                                        onChange={(e) => setEditingNsmCollectionDate(e.target.value)}
+                                        className="w-full px-2 py-1 rounded bg-[var(--bg3)] border border-[var(--border)] text-[var(--text)]"
+                                      />
+                                    ) : (
+                                      h.date && !isNaN(new Date(h.date.split('T')[0] + 'T12:00:00Z').getTime())
+                                        ? format(new Date(h.date.split('T')[0] + 'T12:00:00Z'), 'dd/MM/yy', { locale: ptBR })
+                                        : '-'
+                                    )}
                                   </td>
-                                  <td className="py-1 text-right font-mono text-[var(--text)]">{m.isNumeric ? Number(h.value).toLocaleString() : h.value}</td>
+                                  <td className="py-1 text-right font-mono text-[var(--text)]">
+                                    {editingNsmCollectionId === Number(h?.id) ? (
+                                      <input
+                                        value={editingNsmCollectionValue}
+                                        onChange={(e) => setEditingNsmCollectionValue(e.target.value)}
+                                        className="w-full px-2 py-1 rounded bg-[var(--bg3)] border border-[var(--border)] text-[var(--text)] text-right font-mono"
+                                      />
+                                    ) : (
+                                      m.isNumeric ? Number(h.value).toLocaleString() : h.value
+                                    )}
+                                  </td>
+                                  <td className="py-1 text-right">
+                                    <div className="flex justify-end gap-1.5">
+                                      {editingNsmCollectionId === Number(h?.id) ? (
+                                        <>
+                                          <button
+                                            onClick={saveEditNsmCollection}
+                                            disabled={isSavingNsmCollection}
+                                            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[var(--bg4)] text-[var(--text-mid)]"
+                                            title="Salvar"
+                                          >
+                                            <Check size={14} />
+                                          </button>
+                                          <button
+                                            onClick={cancelEditNsmCollection}
+                                            disabled={isSavingNsmCollection}
+                                            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[var(--bg4)] text-[var(--text-mid)]"
+                                            title="Cancelar"
+                                          >
+                                            <X size={14} />
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => startEditNsmCollection(h)}
+                                            disabled={h?.id == null}
+                                            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[var(--bg4)] text-[var(--text-mid)]"
+                                            title={h?.id == null ? 'Item sem ID (não editável)' : 'Editar'}
+                                          >
+                                            <Pencil size={14} />
+                                          </button>
+                                          <button
+                                            onClick={() => h?.id != null && onDeleteNsmCollection(Number(h.id))}
+                                            disabled={h?.id == null}
+                                            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-[var(--bg4)] text-[var(--red)]"
+                                            title={h?.id == null ? 'Item sem ID (não removível)' : 'Remover'}
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
