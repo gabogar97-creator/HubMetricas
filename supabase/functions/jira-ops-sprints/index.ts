@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "spDone") {
-      const jql = `project = IA AND sprint = ${sprintId} AND type IN (Epic, Story, "Implementações") ORDER BY created DESC`;
+      const jql = `project = IA AND sprint = ${sprintId} AND issuetype != Epic AND type IN (Story, "Implementações", Bug) ORDER BY created DESC`;
       const fields = [
         "summary",
         "key",
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "spEstimate") {
-      const jql = `project = IA AND sprint = ${sprintId} AND type IN (Epic, Story, "Implementações") ORDER BY created DESC`;
+      const jql = `project = IA AND sprint = ${sprintId} AND issuetype != Epic AND type IN (Story, "Implementações", Bug) ORDER BY created DESC`;
       const fields = [
         "summary",
         "key",
@@ -361,7 +361,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "throughput") {
-      const jql = `project = IA AND sprint = ${sprintId} AND type IN ("Implementações", Bug) AND status = "Concluído" ORDER BY created DESC`;
+      const jql = `project = IA AND sprint = ${sprintId} AND issuetype != Epic AND type IN ("Implementações", Story, Bug) AND status = "Concluído" ORDER BY created DESC`;
       const fields = [
         "summary",
         "key",
