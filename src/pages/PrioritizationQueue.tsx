@@ -159,6 +159,9 @@ export function PrioritizationQueue() {
     if (queueListTab === 'to_prioritize') {
       return [...base].sort((a: any, b: any) => (Number(b.estimatedRoi12m) || 0) - (Number(a.estimatedRoi12m) || 0));
     }
+    if (queueListTab === 'prioritized') {
+      return [...base].sort((a: any, b: any) => (Number(b.estimatedRoi12m) || 0) - (Number(a.estimatedRoi12m) || 0));
+    }
     return base;
   }, [queueProjects, queueListTab, filterBu, filterSponsor, filterId, filterTitle]);
 
