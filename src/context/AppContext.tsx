@@ -241,11 +241,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const rawProjects = projRes.data || [];
 
       const projectIds = rawProjects.map((p: any) => p.id).filter((id: any) => id != null);
-      const colRes = projectIds.length
+      const nsmIds = rawProjects
+        .flatMap((p: any) => (p?.nsms || p?.NSMs || []) as any[])
+        .map((n: any) => n?.id)
+        .filter((id: any) => id != null);
+
+      const colRes = projectIds.length || nsmIds.length
         ? await supabase
             .from('collection_nsms')
             .select('*')
-            .in('project_id', projectIds)
+            .or(
+              [
+                projectIds.length ? `project_id.in.(${projectIds.join(',')})` : null,
+                nsmIds.length ? `nsm_id.in.(${nsmIds.join(',')})` : null
+              ]
+                .filter(Boolean)
+                .join(',')
+            )
         : { data: [], error: null as any };
 
       if ((colRes as any).error) {
@@ -321,12 +333,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const krs = ((krRes as any).data || []) as any[];
         const krIds = krs.map(k => k.id).filter((id: any) => id != null);
 
-        const colKrRes = krIds.length
-          ? await supabase
-              .from('collection_okr_key_results')
+        let colKrRes: any = { data: [], error: null as any };
+        if (krIds.length) {
+          const primary = await supabase
+            .from('collection_okr_key_results')
+            .select('*')
+            .in('okr_key_result_id', krIds);
+
+          if ((primary as any)?.error) {
+            const fallback = await supabase
+              .from('collection_okr_results')
               .select('*')
-              .in('okr_key_result_id', krIds)
-          : { data: [], error: null as any };
+              .in('okr_key_result_id', krIds);
+            colKrRes = fallback;
+          } else {
+            colKrRes = primary;
+          }
+        }
 
         if ((colKrRes as any).error) throw (colKrRes as any).error;
 
