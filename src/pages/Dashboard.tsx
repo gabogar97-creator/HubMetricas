@@ -544,24 +544,24 @@ export function Dashboard() {
     const projectNsmList: any[] = [];
     const nsmTimeline: Record<string, any> = {};
     const metricsSet = new Set<string>();
+    const projectsWithNsmSet = new Set<string>();
 
     const processNsm = (nsm: any, projectName: string) => {
       metricsSet.add(nsm.name);
       if (selectedMetricFilter !== 'all' && nsm.name !== selectedMetricFilter) return;
 
       const collections = nsm.CollectionNSMs || [];
-      if (!collections || collections.length === 0) return;
-      totalProjectsWithNsm++;
+      projectsWithNsmSet.add(projectName);
       
       // Sort to get latest
       const sorted = [...collections].sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
-      const latest = sorted[0];
+      const latest = sorted[0] || null;
       
       const isNumeric = ['number', 'percentage', 'currency'].includes(nsm.type || 'number');
-      let achievement = 0;
+      let achievement: number | null = null;
       
-      if (isNumeric) {
-        const valNum = Number(latest.value) || 0;
+      if (isNumeric && latest) {
+        const valNum = Number((latest as any).value) || 0;
         const tgtNum = Number(nsm.target) || 0;
         achievement = tgtNum > 0 ? (valNum / tgtNum) * 100 : 0;
         sumAchievement += achievement;
@@ -572,16 +572,16 @@ export function Dashboard() {
         name: projectName,
         metricName: nsm.name,
         type: nsm.type || 'number',
-        value: latest.value,
+        value: latest ? (latest as any).value : '—',
         target: nsm.target,
         achievement,
-        date: latest.date,
+        date: latest ? (latest as any).date : null,
         isNumeric,
         history: sorted
       });
 
       // Timeline
-      if (isNumeric) {
+      if (isNumeric && latest) {
         sorted.forEach(col => {
           if (!col.date) return;
           const d = new Date(col.date.split('T')[0] + 'T12:00:00Z');
@@ -604,6 +604,8 @@ export function Dashboard() {
         p.NSMs.forEach(nsm => processNsm(nsm, p.name));
       }
     });
+
+    totalProjectsWithNsm = projectsWithNsmSet.size;
 
     const avgAchievement = totalNumericNsms > 0 ? sumAchievement / totalNumericNsms : 0;
 
