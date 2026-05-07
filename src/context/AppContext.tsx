@@ -348,6 +348,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
             colKrRes = fallback;
           } else {
             colKrRes = primary;
+            const primaryRows = ((primary as any)?.data || []) as any[];
+            if (primaryRows.length === 0) {
+              const fallback = await supabase
+                .from('collection_okr_results')
+                .select('*')
+                .in('okr_key_result_id', krIds);
+              const fallbackRows = ((fallback as any)?.data || []) as any[];
+              if (!(fallback as any)?.error && fallbackRows.length > 0) {
+                colKrRes = fallback;
+              }
+            }
           }
         }
 
