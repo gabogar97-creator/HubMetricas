@@ -1091,8 +1091,28 @@ export function Dashboard() {
                         <div className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider">{m.metricName}</div>
                       </div>
                       {m.isNumeric ? (
-                        <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold w-fit" style={{ background: m.achievement >= 100 ? 'var(--green-dim)' : m.achievement >= 80 ? 'rgba(245,158,11,0.1)' : 'rgba(244,63,94,0.1)', color: m.achievement >= 100 ? 'var(--green)' : m.achievement >= 80 ? 'var(--yellow)' : 'var(--red)' }}>
-                          {m.achievement.toFixed(1)}%
+                        <span
+                          className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold w-fit"
+                          style={{
+                            background:
+                              m.achievement == null
+                                ? 'rgba(148,163,184,0.15)'
+                                : m.achievement >= 100
+                                  ? 'var(--green-dim)'
+                                  : m.achievement >= 80
+                                    ? 'rgba(245,158,11,0.1)'
+                                    : 'rgba(244,63,94,0.1)',
+                            color:
+                              m.achievement == null
+                                ? 'var(--text-dim)'
+                                : m.achievement >= 100
+                                  ? 'var(--green)'
+                                  : m.achievement >= 80
+                                    ? 'var(--yellow)'
+                                    : 'var(--red)'
+                          }}
+                        >
+                          {m.achievement == null ? '—' : `${m.achievement.toFixed(1)}%`}
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold glass-card text-[var(--text-mid)] w-fit">
