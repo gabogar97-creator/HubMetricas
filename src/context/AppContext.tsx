@@ -217,6 +217,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshData = async () => {
+    setLoading(true);
     console.log('--- refreshData function starting now (final check 2) ---');
     console.log('--- refreshData function starting now (final check) ---');
     console.log('--- refreshData function starting now ---');
@@ -740,6 +741,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (!user?.id) return;
     refreshData();
   }, [user?.id]);
 

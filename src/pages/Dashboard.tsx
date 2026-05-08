@@ -28,6 +28,10 @@ export function Dashboard() {
     deleteOkrKeyResult,
     deleteCollectionOkrKeyResult
   } = useAppContext();
+
+  useEffect(() => {
+    refreshData();
+  }, []);
   const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe' | 'ops'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
   const [isNsmModalOpen, setIsNsmModalOpen] = useState(false);
