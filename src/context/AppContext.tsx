@@ -334,46 +334,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const krs = ((krRes as any).data || []) as any[];
         const krIds = krs.map(k => k.id).filter((id: any) => id != null);
 
-        let colKrRes: any = { data: [], error: null as any };
-        if (krIds.length) {
-          const primary = await supabase
-            .from('collection_okr_key_results')
-            .select('*')
-            .in('okr_key_result_id', krIds);
-
-          if ((primary as any)?.error) {
-            const fallback = await supabase
-              .from('collection_okr_results')
+        const colKrRes = krIds.length
+          ? await supabase
+              .from('collection_okr_key_results')
               .select('*')
-              .in('okr_key_result_id', krIds);
-            const fbErr: any = (fallback as any)?.error;
-            const fbMsg = String(fbErr?.message || '').toLowerCase();
-            const fbCode = String(fbErr?.code || '');
-            if (fbErr && (fbCode === '42P01' || fbMsg.includes('does not exist') || fbMsg.includes('not found'))) {
-              colKrRes = { data: [], error: null };
-            } else {
-              colKrRes = fallback;
-            }
-          } else {
-            colKrRes = primary;
-            const primaryRows = ((primary as any)?.data || []) as any[];
-            if (primaryRows.length === 0) {
-              const fallback = await supabase
-                .from('collection_okr_results')
-                .select('*')
-                .in('okr_key_result_id', krIds);
-              const fallbackRows = ((fallback as any)?.data || []) as any[];
-              const fbErr: any = (fallback as any)?.error;
-              const fbMsg = String(fbErr?.message || '').toLowerCase();
-              const fbCode = String(fbErr?.code || '');
-              if (fbErr && (fbCode === '42P01' || fbMsg.includes('does not exist') || fbMsg.includes('not found'))) {
-                // ignore missing legacy table
-              } else if (!fbErr && fallbackRows.length > 0) {
-                colKrRes = fallback;
-              }
-            }
-          }
-        }
+              .in('okr_key_result_id', krIds)
+          : { data: [], error: null as any };
 
         if ((colKrRes as any).error) throw (colKrRes as any).error;
 
