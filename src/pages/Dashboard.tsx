@@ -30,16 +30,6 @@ export function Dashboard() {
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe' | 'ops'>('roi');
-
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'roi' || activeTab === 'nsm' || activeTab === 'pe') {
-      refreshData();
-    }
-  }, [activeTab, refreshData]);
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
   const [isNsmModalOpen, setIsNsmModalOpen] = useState(false);
   const [newNsmId, setNewNsmId] = useState('');

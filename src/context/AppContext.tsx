@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -216,7 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await refreshData();
   };
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     console.log('--- refreshData function starting now (final check 2) ---');
     console.log('--- refreshData function starting now (final check) ---');
@@ -346,7 +346,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
               .from('collection_okr_results')
               .select('*')
               .in('okr_key_result_id', krIds);
-            colKrRes = fallback;
+            const fbErr: any = (fallback as any)?.error;
+            const fbMsg = String(fbErr?.message || '').toLowerCase();
+            const fbCode = String(fbErr?.code || '');
+            if (fbErr && (fbCode === '42P01' || fbMsg.includes('does not exist') || fbMsg.includes('not found'))) {
+              colKrRes = { data: [], error: null };
+            } else {
+              colKrRes = fallback;
+            }
           } else {
             colKrRes = primary;
             const primaryRows = ((primary as any)?.data || []) as any[];
@@ -356,7 +363,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 .select('*')
                 .in('okr_key_result_id', krIds);
               const fallbackRows = ((fallback as any)?.data || []) as any[];
-              if (!(fallback as any)?.error && fallbackRows.length > 0) {
+              const fbErr: any = (fallback as any)?.error;
+              const fbMsg = String(fbErr?.message || '').toLowerCase();
+              const fbCode = String(fbErr?.code || '');
+              if (fbErr && (fbCode === '42P01' || fbMsg.includes('does not exist') || fbMsg.includes('not found'))) {
+                // ignore missing legacy table
+              } else if (!fbErr && fallbackRows.length > 0) {
                 colKrRes = fallback;
               }
             }
@@ -421,7 +433,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const deleteProject = async (id: number) => {
     const project = projects.find(p => p.id === id);
