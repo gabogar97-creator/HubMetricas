@@ -29,6 +29,8 @@ export function Dashboard() {
     deleteCollectionOkrKeyResult
   } = useAppContext();
 
+  const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe' | 'ops'>('roi');
+
   useEffect(() => {
     refreshData();
   }, []);
@@ -38,7 +40,6 @@ export function Dashboard() {
       refreshData();
     }
   }, [activeTab, refreshData]);
-  const [activeTab, setActiveTab] = useState<'roi' | 'nsm' | 'pe' | 'ops'>('roi');
   const [selectedMetricFilter, setSelectedMetricFilter] = useState<string>('all');
   const [isNsmModalOpen, setIsNsmModalOpen] = useState(false);
   const [newNsmId, setNewNsmId] = useState('');
