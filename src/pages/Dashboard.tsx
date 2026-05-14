@@ -468,7 +468,7 @@ export function Dashboard() {
     const projMetrics: any[] = [];
 
     projects.forEach(p => {
-      const pInv = getLatestAccumulatedValue(p.CollectionROIs, 'Custo');
+      const pInv = getLatestAccumulatedValue(p.CollectionROIs, 'Custo - Via Jira');
       const pSav = getLatestAccumulatedValue(p.CollectionROIs, 'Saving');
       const pCa = getLatestAccumulatedValue(p.CollectionROIs, 'Cost Avoidance');
       const pRev = getLatestAccumulatedValue(p.CollectionROIs, 'Revenue');
@@ -494,14 +494,20 @@ export function Dashboard() {
       rev += pRev;
 
       if (hasCollections) {
-        projCount++;
-        const pRoi = pInv > 0 ? ((pRet - pInv) / pInv) * 100 : (pRet > 0 ? 100 : 0);
-        sumRoi += pRoi;
+        const pRoi = pInv > 0 ? ((pRet - pInv) / pInv) * 100 : null;
 
         const months = Math.max(1, differenceInMonths(lastDate, firstDate) || 1);
         const avgMonthlyRet = pRet / months;
-        const pPayback = avgMonthlyRet > 0 ? pInv / avgMonthlyRet : 0;
-        sumPayback += pPayback;
+        const pPayback = pInv > 0 && avgMonthlyRet > 0 ? pInv / avgMonthlyRet : null;
+
+        if (pRoi != null) {
+          projCount++;
+          sumRoi += pRoi;
+        }
+
+        if (pPayback != null) {
+          sumPayback += pPayback;
+        }
 
         projMetrics.push({
           id: p.id,
