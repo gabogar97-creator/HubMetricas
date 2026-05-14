@@ -212,7 +212,7 @@ export function Projects() {
     const projectCollections = project.CollectionROIs || [];
     const sortedPc = [...projectCollections].sort((a, b) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0));
 
-    const invAcc = getLatestAccumulatedValue(projectCollections, 'Custo');
+    const costAcc = getLatestAccumulatedValue(projectCollections, 'Custo - Via Jira');
     const savAcc = getLatestAccumulatedValue(projectCollections, 'Saving');
     const caAcc = getLatestAccumulatedValue(projectCollections, 'Cost Avoidance');
     const revAcc = getLatestAccumulatedValue(projectCollections, 'Revenue');
@@ -228,12 +228,13 @@ export function Projects() {
 
       const month = format(d, 'MMM/yy', { locale: ptBR });
       if (!monthlyData[month]) {
-        monthlyData[month] = { date: month, Custo: 0, Saving: 0, 'Custo Evitado': 0, Receita: 0, Investimento: 0 };
+        monthlyData[month] = { date: month, Custo: 0, 'Custo Jira': 0, Saving: 0, 'Custo Evitado': 0, Receita: 0, Investimento: 0 };
       }
 
-      if (col.type === 'Custo') {
+      if (col.type === 'Custo - Via Jira') {
         inv += col.totalValue;
         monthlyData[month].Investimento += col.totalValue;
+        monthlyData[month]['Custo Jira'] += col.totalValue;
       } else {
         ret += col.totalValue;
         if (col.type === 'Saving') { sav += col.totalValue; monthlyData[month].Saving += col.totalValue; }
@@ -279,17 +280,17 @@ export function Projects() {
       return timeA - timeB;
     });
 
-    const pRoi = invAcc > 0 ? ((retAcc - invAcc) / invAcc) * 100 : (retAcc > 0 ? null : null);
+    const pRoi = costAcc > 0 ? ((retAcc - costAcc) / costAcc) * 100 : (retAcc > 0 ? null : null);
     const months = Math.max(1, differenceInMonths(lastDate, firstDate) || 1);
     const avgMonthlyRet = retAcc / months;
-    const pPayback = avgMonthlyRet > 0 ? invAcc / avgMonthlyRet : null;
+    const pPayback = avgMonthlyRet > 0 ? costAcc / avgMonthlyRet : null;
 
     const paybackDate = pPayback != null ? addMonths(firstDate, Math.round(pPayback)) : null;
     const paybackMonthLabel = paybackDate ? format(paybackDate, 'MMM/yy', { locale: ptBR }) : null;
     const nsmSeriesLabel = nsmNames.size === 1 ? Array.from(nsmNames)[0] : (nsmNames.size > 1 ? 'Média (NSMs)' : null);
 
     return {
-      totalInvestment: invAcc,
+      totalInvestment: costAcc,
       totalReturn: retAcc,
       totalSaving: savAcc,
       totalCostAvoidance: caAcc,
@@ -424,7 +425,7 @@ export function Projects() {
                     <Line type="monotone" dataKey="Saving" stroke="var(--saving)" strokeWidth={2} dot={{fill:"var(--saving)",r:3}}/>
                     <Line type="monotone" dataKey="Custo Evitado" stroke="var(--custo-evitado)" strokeWidth={2} dot={{fill:"var(--custo-evitado)",r:3}}/>
                     <Line type="monotone" dataKey="Receita" stroke="var(--receita)" strokeWidth={2} dot={{fill:"var(--receita)",r:3}}/>
-                    <Line type="monotone" dataKey="Investimento" stroke="var(--red)" strokeWidth={2} strokeDasharray="5 3" dot={{fill:"var(--red)",r:3}}/>
+                    <Line type="monotone" dataKey="Custo Jira" stroke="var(--red)" strokeWidth={2} strokeDasharray="5 3" dot={{fill:"var(--red)",r:3}}/>
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -569,39 +570,38 @@ export function Projects() {
                 <table className="w-full border-collapse text-xs">
                   <thead>
                     <tr>
-                      {["Data","Investimento","Custo Jira","Saving","Custo Evitado","Receita","Total Retorno","ROI",""] .map(h => (
+                      {["Data","Custo Jira","Saving","Custo Evitado","Receita","Total Retorno","ROI",""] .map(h => (
                         <th key={h} className="p-[9px_12px] text-left bg-[var(--surface-high)] text-[var(--text-dim)] font-bold text-[10px] uppercase tracking-[0.07em] border-b border-[var(--border)] whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedCollections.map((g: any) => {
-                      const tot = (g.saving || 0) + (g.costAvoidance || 0) + (g.revenue || 0);
-                      const invC = (g.cost || 0) + (g.costJira || 0);
-                      const roi = invC > 0 ? ((tot - invC) / invC) * 100 : null;
-                      const primary = g.raw?.find((r: any) => r.type === 'Custo - Via Jira')
-                        || g.raw?.find((r: any) => r.type === 'Custo')
-                        || g.raw?.[0];
-                      return (
-                        <tr
-                          key={g.key}
-                          onClick={() => primary && openCollectionDetails(primary)}
-                          className="cursor-pointer hover:bg-[var(--surface-high)] transition-colors"
-                        >
-                          <td className="p-[10px_12px] border-b border-[var(--border)] font-semibold text-[var(--text)]">{fmtDate(g.date)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(invC)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(g.costJira || 0)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--saving)]">{fmt(g.saving || 0)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--custo-evitado)]">{fmt(g.costAvoidance || 0)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--receita)]">{fmt(g.revenue || 0)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--green)] font-semibold">{fmt(tot)}</td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)]">
-                            <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: roi != null ? (roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)') : 'transparent', color: roi != null ? (roi >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-dim)' }}>
-                              {roi != null ? fmtPct(roi) : "—"}
-                            </span>
-                          </td>
-                          <td className="p-[10px_12px] border-b border-[var(--border)]">
-                            <div className="flex gap-1.5">
+                      {groupedCollections.map((g: any) => {
+                        const tot = (g.saving || 0) + (g.costAvoidance || 0) + (g.revenue || 0);
+                        const cost = (g.costJira || 0);
+                        const roi = cost > 0 ? ((tot - cost) / cost) * 100 : null;
+                        const primary = g.raw?.find((r: any) => r.type === 'Custo - Via Jira')
+                          || g.raw?.find((r: any) => r.type === 'Custo')
+                          || g.raw?.[0];
+                        return (
+                          <tr
+                            key={g.key}
+                            onClick={() => primary && openCollectionDetails(primary)}
+                            className="cursor-pointer hover:bg-[var(--surface-high)] transition-colors"
+                          >
+                            <td className="p-[10px_12px] border-b border-[var(--border)] font-semibold text-[var(--text)]">{fmtDate(g.date)}</td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--red)]">{fmt(g.costJira || 0)}</td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--saving)]">{fmt(g.saving || 0)}</td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--custo-evitado)]">{fmt(g.costAvoidance || 0)}</td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--receita)]">{fmt(g.revenue || 0)}</td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)] text-[var(--green)] font-semibold">{fmt(tot)}</td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)]">
+                              <span className="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] font-bold" style={{ background: roi != null ? (roi >= 0 ? 'var(--green-dim)' : 'rgba(244,63,94,0.1)') : 'transparent', color: roi != null ? (roi >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-dim)' }}>
+                                {roi != null ? fmtPct(roi) : "—"}
+                              </span>
+                            </td>
+                            <td className="p-[10px_12px] border-b border-[var(--border)]">
+                              <div className="flex gap-1.5">
                               <button
                                 className="bg-transparent border-none text-[var(--red)] cursor-pointer p-1 hover:opacity-80"
                                 onClick={(e) => {
