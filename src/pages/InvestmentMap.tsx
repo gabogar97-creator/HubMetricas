@@ -1,12 +1,82 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
+import { ResponsiveContainer, Treemap } from 'recharts';
+import { supabase } from '../lib/supabase';
 
 export function InvestmentMap() {
   const navigate = useNavigate();
   const [metric, setMetric] = useState<'roi' | 'receita' | 'saving' | 'custo_evitado' | 'investimento'>('roi');
+  const [selectedBu, setSelectedBu] = useState<string>('');
+  const [availableBus, setAvailableBus] = useState<string[]>([]);
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+
+  const asText = (v: any, fallback = '—') => {
+    if (v == null) return fallback;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (typeof v === 'object') {
+      if (typeof (v as any).value === 'string') return (v as any).value;
+      if (typeof (v as any).name === 'string') return (v as any).name;
+      if (typeof (v as any).text === 'string') return (v as any).text;
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
+  useEffect(() => {
+    let canceled = false;
+
+    const loadBus = async () => {
+      try {
+        const envJiraEmail = import.meta.env.VITE_JIRA_EMAIL as string | undefined;
+        const envJiraToken = import.meta.env.VITE_JIRA_API_TOKEN as string | undefined;
+
+        const load = async (listType: 'to_prioritize' | 'prioritized') => {
+          const { data, error } = await supabase.functions.invoke('jira-prioritization-epics', {
+            body: {
+              ...(envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken } : {}),
+              listType,
+            },
+          });
+          if (error) throw new Error(error.message || 'Falha ao consultar Jira.');
+          return ((data as any)?.issues || []) as any[];
+        };
+
+        const [toPrioritize, prioritized] = await Promise.all([
+          load('to_prioritize'),
+          load('prioritized'),
+        ]);
+
+        const bus = new Set<string>();
+        [...toPrioritize, ...prioritized].forEach((i: any) => {
+          const bu = asText(i?.customfield_10851, '');
+          if (bu && bu !== '—') bus.add(bu);
+        });
+
+        const list = Array.from(bus).sort();
+        if (!canceled) setAvailableBus(list);
+      } catch {
+        if (!canceled) setAvailableBus([]);
+      }
+    };
+
+    loadBus();
+    return () => {
+      canceled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!selectedBu) return;
+    if (availableBus.includes(selectedBu)) return;
+    setSelectedBu('');
+  }, [availableBus, selectedBu]);
 
   const areas = useMemo(() => {
     return [
@@ -94,6 +164,14 @@ export function InvestmentMap() {
     ];
   }, []);
 
+  const areasWithBu = useMemo(() => {
+    if (!availableBus || availableBus.length === 0) return areas.map((a) => ({ ...a, bu: '' }));
+    return areas.map((a, idx) => ({
+      ...a,
+      bu: availableBus[idx % availableBus.length],
+    }));
+  }, [areas, availableBus]);
+
   const metricLabel = useMemo(() => {
     if (metric === 'roi') return 'ROI geral';
     if (metric === 'receita') return 'Receita';
@@ -111,11 +189,29 @@ export function InvestmentMap() {
       return Number(a.investment) || 0;
     };
 
-    const children = areas
+    const palette = [
+      '#38bdf8',
+      '#a78bfa',
+      '#22c55e',
+      '#f59e0b',
+      '#f97316',
+      '#ef4444',
+      '#14b8a6',
+      '#60a5fa',
+      '#e879f9',
+    ];
+
+    const base = selectedBu
+      ? areasWithBu.filter((a: any) => String(a?.bu || '') === selectedBu)
+      : areasWithBu;
+
+    const children = base
       .map((a) => ({
         id: a.id,
         name: a.name,
         value: Math.max(0, getValue(a)),
+        color: palette[Math.abs(String(a.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % palette.length],
+        bu: a.bu,
         investment: a.investment,
         roiTotal: a.roiTotal,
         receita: a.receita,
@@ -125,7 +221,70 @@ export function InvestmentMap() {
       .sort((x, y) => (y.value || 0) - (x.value || 0));
 
     return [{ name: 'Mapa de Investimento', children }];
-  }, [areas, metric]);
+  }, [areasWithBu, metric, selectedBu]);
+
+  const TreemapContent = ({ x, y, width, height, name, payload }: any) => {
+    if (width <= 0 || height <= 0) return null;
+
+    const c = payload?.color || 'rgba(56,189,248,0.25)';
+    const showText = width > 90 && height > 54;
+    const showLines = width > 140 && height > 86;
+
+    return (
+      <g>
+        <rect
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          rx={14}
+          ry={14}
+          style={{
+            fill: c,
+            fillOpacity: 0.22,
+            stroke: 'rgba(255,255,255,0.12)',
+            strokeWidth: 1,
+          }}
+        />
+        <rect
+          x={x + 1}
+          y={y + 1}
+          width={Math.max(0, width - 2)}
+          height={Math.max(0, height - 2)}
+          rx={13}
+          ry={13}
+          style={{
+            fill: 'rgba(0,0,0,0.10)',
+            stroke: 'rgba(255,255,255,0.08)',
+            strokeWidth: 1,
+          }}
+        />
+
+        {showText && (
+          <text x={x + 12} y={y + 20} fill="rgba(255,255,255,0.92)" fontSize={12} fontWeight={800}>
+            {String(name || '').slice(0, 40)}
+          </text>
+        )}
+
+        {showLines && (
+          <>
+            <text x={x + 12} y={y + 42} fill="rgba(255,255,255,0.85)" fontSize={11} fontWeight={700}>
+              Inv: {fmtCurrency(Number(payload?.investment) || 0)}
+            </text>
+            <text x={x + 12} y={y + 60} fill="rgba(255,255,255,0.85)" fontSize={11} fontWeight={700}>
+              ROI: {fmtCurrency(Number(payload?.roiTotal) || 0)}
+            </text>
+            <text x={x + 12} y={y + 78} fill="rgba(255,255,255,0.78)" fontSize={10} fontWeight={700}>
+              Saving: {fmtCurrency(Number(payload?.saving) || 0)}
+            </text>
+            <text x={x + 12} y={y + 94} fill="rgba(255,255,255,0.78)" fontSize={10} fontWeight={700}>
+              C. Evitado: {fmtCurrency(Number(payload?.custoEvitado) || 0)}
+            </text>
+          </>
+        )}
+      </g>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
@@ -200,6 +359,25 @@ export function InvestmentMap() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-4">
+          <div className="lg:col-span-2">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em] mb-1">BU</div>
+            <select
+              value={selectedBu}
+              onChange={(e) => setSelectedBu(e.target.value)}
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            >
+              <option value="">Todas</option>
+              {availableBus.map((bu) => (
+                <option key={bu} value={bu}>{bu}</option>
+              ))}
+            </select>
+          </div>
+          <div className="lg:col-span-3 flex items-end">
+            <div className="text-[11px] text-[var(--text-dim)]">Usa a mesma lista de BUs da Fila de Priorização (Jira).</div>
+          </div>
+        </div>
+
         <div
           className="rounded-2xl overflow-hidden"
           style={{
@@ -219,6 +397,7 @@ export function InvestmentMap() {
                 aspectRatio={4 / 3}
                 animationDuration={350}
                 animationEasing="ease"
+                content={<TreemapContent />}
                 onClick={(node: any) => {
                   if (node?.id) navigate('/queue');
                 }}
@@ -231,32 +410,6 @@ export function InvestmentMap() {
           <div className="text-[11px] text-[var(--text-dim)]">Dica: clique em qualquer área do Treemap para abrir a Fila de Priorização.</div>
         </div>
 
-        <Tooltip
-          content={({ active, payload }: any) => {
-            if (!active || !payload || payload.length === 0) return null;
-            const p = payload[0]?.payload;
-            if (!p || !p.name) return null;
-            const value = Number(p.value) || 0;
-
-            return (
-              <div className="glass-card rounded-xl p-3" style={{ border: '1px solid rgba(56,189,248,0.32)', boxShadow: '0 26px 80px rgba(0,0,0,0.65)' }}>
-                <div className="text-[10px] text-[rgba(56,189,248,0.95)] font-bold uppercase tracking-[0.07em]">{p.name}</div>
-                <div className="mt-2 text-[12px] text-[var(--text)] font-extrabold">{metricLabel}: <span className="text-[rgba(56,189,248,0.95)]">{fmtCurrency(value)}</span></div>
-                <div className="mt-2 text-[11px] text-[var(--text-dim)]">
-                  Investimento: <span className="font-bold" style={{ color: 'var(--red)' }}>{fmtCurrency(Number(p.investment) || 0)}</span>
-                  <br />
-                  ROI: <span className="font-bold" style={{ color: 'var(--green)' }}>{fmtCurrency(Number(p.roiTotal) || 0)}</span>
-                  <br />
-                  Receita: <span className="font-bold" style={{ color: 'var(--receita)' }}>{fmtCurrency(Number(p.receita) || 0)}</span>
-                  <br />
-                  Saving: <span className="font-bold" style={{ color: 'var(--saving)' }}>{fmtCurrency(Number(p.saving) || 0)}</span>
-                  <br />
-                  Custo Evitado: <span className="font-bold" style={{ color: 'var(--custo-evitado)' }}>{fmtCurrency(Number(p.custoEvitado) || 0)}</span>
-                </div>
-              </div>
-            );
-          }}
-        />
       </div>
     </div>
   );
