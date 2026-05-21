@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 
 export function InvestmentMap() {
   const navigate = useNavigate();
-  const [selectedQuadrantId, setSelectedQuadrantId] = useState<string | null>(null);
+  const [metric, setMetric] = useState<'roi' | 'receita' | 'saving' | 'custo_evitado' | 'investimento'>('roi');
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
-  const quadrants = useMemo(() => {
+  const areas = useMemo(() => {
     return [
       {
         id: 'dev_prod',
@@ -93,10 +94,38 @@ export function InvestmentMap() {
     ];
   }, []);
 
-  const selectedQuadrant = useMemo(
-    () => quadrants.find((q) => q.id === selectedQuadrantId) || null,
-    [quadrants, selectedQuadrantId]
-  );
+  const metricLabel = useMemo(() => {
+    if (metric === 'roi') return 'ROI geral';
+    if (metric === 'receita') return 'Receita';
+    if (metric === 'saving') return 'Saving';
+    if (metric === 'custo_evitado') return 'Custo evitado';
+    return 'Investimento alocado';
+  }, [metric]);
+
+  const treemapData = useMemo(() => {
+    const getValue = (a: any) => {
+      if (metric === 'roi') return Number(a.roiTotal) || 0;
+      if (metric === 'receita') return Number(a.receita) || 0;
+      if (metric === 'saving') return Number(a.saving) || 0;
+      if (metric === 'custo_evitado') return Number(a.custoEvitado) || 0;
+      return Number(a.investment) || 0;
+    };
+
+    const children = areas
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        value: Math.max(0, getValue(a)),
+        investment: a.investment,
+        roiTotal: a.roiTotal,
+        receita: a.receita,
+        saving: a.saving,
+        custoEvitado: a.custoEvitado,
+      }))
+      .sort((x, y) => (y.value || 0) - (x.value || 0));
+
+    return [{ name: 'Mapa de Investimento', children }];
+  }, [areas, metric]);
 
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
@@ -104,7 +133,7 @@ export function InvestmentMap() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Mapa de Investimento</div>
-            <div className="text-[12px] text-[var(--text-dim)] mt-1">Clique em um quadrante para visualizar o investimento e a quebra do ROI.</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Treemap por área · selecione a métrica para recalcular o mapa.</div>
           </div>
           <button
             type="button"
@@ -117,149 +146,117 @@ export function InvestmentMap() {
       </div>
 
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] border border-[var(--border)]">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Planta Arquitetural</div>
-                <div className="text-[12px] text-[var(--text-dim)] mt-1">9 quadrantes · clique para selecionar</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedQuadrantId(null)}
-                className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-              >
-                Limpar seleção
-              </button>
-            </div>
-
-            <div
-              className="rounded-2xl overflow-hidden"
-              style={{
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.14))',
-                boxShadow: '0 30px 110px rgba(0,0,0,0.45)',
-              }}
-            >
-              <div className="p-4">
-                <div className="grid grid-cols-3 gap-3">
-                  {quadrants.map((q) => {
-                    const selected = q.id === selectedQuadrantId;
-                    return (
-                      <button
-                        key={q.id}
-                        type="button"
-                        onClick={() => setSelectedQuadrantId(q.id)}
-                        className="text-left rounded-2xl transition-all duration-200"
-                        style={{
-                          border: selected ? '1px solid rgba(56,189,248,0.55)' : '1px solid rgba(255,255,255,0.10)',
-                          background: selected
-                            ? 'linear-gradient(180deg, rgba(56,189,248,0.18), rgba(56,189,248,0.06))'
-                            : 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))',
-                          boxShadow: selected ? '0 18px 44px rgba(56,189,248,0.12)' : 'inset 0 1px 0 rgba(255,255,255,0.05)',
-                          transform: selected ? 'translateY(-1px) scale(1.01)' : 'translateY(0px) scale(1)',
-                        }}
-                      >
-                        <div className="p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-[11px] font-bold text-[var(--text)] leading-snug line-clamp-2">{q.name}</div>
-                              <div className="text-[10px] text-[var(--text-dim)] mt-1">Clique para ver detalhes</div>
-                            </div>
-                            <div
-                              className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5"
-                              style={{ background: selected ? 'rgba(56,189,248,0.95)' : 'rgba(255,255,255,0.20)' }}
-                            />
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-4 gap-2">
-                            {Array.from({ length: 8 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="rounded-md"
-                                style={{
-                                  height: 14,
-                                  background: selected
-                                    ? 'linear-gradient(180deg, rgba(191,219,254,0.55), rgba(56,189,248,0.08))'
-                                    : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.12))',
-                                  border: selected ? '1px solid rgba(56,189,248,0.18)' : '1px solid rgba(255,255,255,0.10)',
-                                }}
-                              />
-                            ))}
-                          </div>
-
-                          <div className="mt-3 flex items-center justify-between">
-                            <div
-                              className="h-[10px] flex-1 rounded-full"
-                              style={{
-                                background: selected
-                                  ? 'linear-gradient(90deg, rgba(56,189,248,0.95), rgba(147,197,253,0.10))'
-                                  : 'linear-gradient(90deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06))',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Métrica</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Visualizando: <span className="text-[var(--text)] font-bold">{metricLabel}</span></div>
           </div>
-
-          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] border border-[var(--border)]">
-            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Detalhes do Quadrante</div>
-
-            {!selectedQuadrant ? (
-              <div className="mt-3 text-[13px] text-[var(--text-dim)]">
-                Selecione um quadrante na planta para visualizar investimento e ROI.
-              </div>
-            ) : (
-              <div className="mt-3">
-                <div className="text-[14px] font-extrabold text-[var(--text)]">{selectedQuadrant.name}</div>
-
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(0,0,0,0.18)] p-3">
-                    <div className="text-[10px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Investimento Estimado</div>
-                    <div className="text-[18px] font-extrabold text-[var(--red)] mt-1">{fmtCurrency(selectedQuadrant.investment)}</div>
-                  </div>
-                  <div className="rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(0,0,0,0.18)] p-3">
-                    <div className="text-[10px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">ROI Estimado (Total)</div>
-                    <div className="text-[18px] font-extrabold text-[var(--green)] mt-1">{fmtCurrency(selectedQuadrant.roiTotal)}</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(0,0,0,0.18)] p-3">
-                  <div className="text-[10px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Quebra do ROI</div>
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.18)] p-2">
-                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Receita</div>
-                      <div className="text-[12px] font-extrabold mt-1" style={{ color: 'var(--receita)' }}>{fmtCurrency(selectedQuadrant.receita)}</div>
-                    </div>
-                    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.18)] p-2">
-                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Saving</div>
-                      <div className="text-[12px] font-extrabold mt-1" style={{ color: 'var(--saving)' }}>{fmtCurrency(selectedQuadrant.saving)}</div>
-                    </div>
-                    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.18)] p-2">
-                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Custo Evitado</div>
-                      <div className="text-[12px] font-extrabold mt-1" style={{ color: 'var(--custo-evitado)' }}>{fmtCurrency(selectedQuadrant.custoEvitado)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/queue')}
-                    className="w-full px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-[0.07em] bg-[rgba(56,189,248,0.14)] text-[rgba(56,189,248,0.95)] border border-[rgba(56,189,248,0.25)] hover:bg-[rgba(56,189,248,0.18)] transition-colors"
-                  >
-                    Abrir projetos na Fila de Priorização
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap">
+            <button
+              type="button"
+              onClick={() => setMetric('roi')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                metric === 'roi' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              ROI geral
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('receita')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                metric === 'receita' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Receita
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('saving')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                metric === 'saving' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Saving
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('custo_evitado')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                metric === 'custo_evitado' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Custo evitado
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetric('investimento')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                metric === 'investimento' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Investimento alocado
+            </button>
           </div>
         </div>
+
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.14))',
+            boxShadow: '0 30px 110px rgba(0,0,0,0.45)',
+          }}
+        >
+          <div className="h-[520px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <Treemap
+                data={treemapData}
+                dataKey="value"
+                nameKey="name"
+                stroke="rgba(255,255,255,0.10)"
+                fill="rgba(56,189,248,0.18)"
+                aspectRatio={4 / 3}
+                animationDuration={350}
+                animationEasing="ease"
+                onClick={(node: any) => {
+                  if (node?.id) navigate('/queue');
+                }}
+              />
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <div className="text-[11px] text-[var(--text-dim)]">Dica: clique em qualquer área do Treemap para abrir a Fila de Priorização.</div>
+        </div>
+
+        <Tooltip
+          content={({ active, payload }: any) => {
+            if (!active || !payload || payload.length === 0) return null;
+            const p = payload[0]?.payload;
+            if (!p || !p.name) return null;
+            const value = Number(p.value) || 0;
+
+            return (
+              <div className="glass-card rounded-xl p-3" style={{ border: '1px solid rgba(56,189,248,0.32)', boxShadow: '0 26px 80px rgba(0,0,0,0.65)' }}>
+                <div className="text-[10px] text-[rgba(56,189,248,0.95)] font-bold uppercase tracking-[0.07em]">{p.name}</div>
+                <div className="mt-2 text-[12px] text-[var(--text)] font-extrabold">{metricLabel}: <span className="text-[rgba(56,189,248,0.95)]">{fmtCurrency(value)}</span></div>
+                <div className="mt-2 text-[11px] text-[var(--text-dim)]">
+                  Investimento: <span className="font-bold" style={{ color: 'var(--red)' }}>{fmtCurrency(Number(p.investment) || 0)}</span>
+                  <br />
+                  ROI: <span className="font-bold" style={{ color: 'var(--green)' }}>{fmtCurrency(Number(p.roiTotal) || 0)}</span>
+                  <br />
+                  Receita: <span className="font-bold" style={{ color: 'var(--receita)' }}>{fmtCurrency(Number(p.receita) || 0)}</span>
+                  <br />
+                  Saving: <span className="font-bold" style={{ color: 'var(--saving)' }}>{fmtCurrency(Number(p.saving) || 0)}</span>
+                  <br />
+                  Custo Evitado: <span className="font-bold" style={{ color: 'var(--custo-evitado)' }}>{fmtCurrency(Number(p.custoEvitado) || 0)}</span>
+                </div>
+              </div>
+            );
+          }}
+        />
       </div>
     </div>
   );
