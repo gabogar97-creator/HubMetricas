@@ -190,15 +190,24 @@ export function InvestmentMap() {
     };
 
     const palette = [
-      '#38bdf8',
-      '#a78bfa',
-      '#22c55e',
-      '#f59e0b',
-      '#f97316',
-      '#ef4444',
-      '#14b8a6',
-      '#60a5fa',
-      '#e879f9',
+      '#22c55e', // green
+      '#16a34a', // green (variant)
+      '#38bdf8', // blue
+      '#60a5fa', // blue (variant)
+      '#ef4444', // red
+      '#dc2626', // red (variant)
+      '#f59e0b', // yellow
+      '#eab308', // yellow (variant)
+      '#f97316', // orange
+      '#fb923c', // orange (variant)
+      '#a78bfa', // purple
+      '#8b5cf6', // purple (variant)
+      '#e879f9', // pink
+      '#f472b6', // pink (variant)
+      '#a16207', // brown
+      '#854d0e', // brown (variant)
+      '#14b8a6', // teal
+      '#0ea5e9', // sky
     ];
 
     const base = selectedBu
@@ -294,17 +303,29 @@ export function InvestmentMap() {
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Mapa de Investimento</div>
             <div className="text-[12px] text-[var(--text-dim)] mt-1">Treemap por área · selecione a métrica para recalcular o mapa.</div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/queue')}
-            className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-          >
-            Abrir Fila de Priorização
-          </button>
         </div>
       </div>
 
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-4">
+          <div className="lg:col-span-2">
+            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em] mb-1">BU</div>
+            <select
+              value={selectedBu}
+              onChange={(e) => setSelectedBu(e.target.value)}
+              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
+            >
+              <option value="">Todas</option>
+              {availableBus.map((bu) => (
+                <option key={bu} value={bu}>{bu}</option>
+              ))}
+            </select>
+          </div>
+          <div className="lg:col-span-3 flex items-end">
+            <div className="text-[11px] text-[var(--text-dim)]">Usa a mesma lista de BUs da Fila de Priorização (Jira).</div>
+          </div>
+        </div>
+
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
           <div className="min-w-0">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Métrica</div>
@@ -359,25 +380,6 @@ export function InvestmentMap() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-4">
-          <div className="lg:col-span-2">
-            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em] mb-1">BU</div>
-            <select
-              value={selectedBu}
-              onChange={(e) => setSelectedBu(e.target.value)}
-              className="w-full bg-[var(--bg4)] border border-[var(--border2)] text-[var(--text)] px-3 py-2 rounded-md text-[13px] font-sans focus:border-[var(--accent)] outline-none transition-colors"
-            >
-              <option value="">Todas</option>
-              {availableBus.map((bu) => (
-                <option key={bu} value={bu}>{bu}</option>
-              ))}
-            </select>
-          </div>
-          <div className="lg:col-span-3 flex items-end">
-            <div className="text-[11px] text-[var(--text-dim)]">Usa a mesma lista de BUs da Fila de Priorização (Jira).</div>
-          </div>
-        </div>
-
         <div
           className="rounded-2xl overflow-hidden"
           style={{
@@ -398,18 +400,10 @@ export function InvestmentMap() {
                 animationDuration={350}
                 animationEasing="ease"
                 content={<TreemapContent />}
-                onClick={(node: any) => {
-                  if (node?.id) navigate('/queue');
-                }}
               />
             </ResponsiveContainer>
           </div>
         </div>
-
-        <div className="mt-3">
-          <div className="text-[11px] text-[var(--text-dim)]">Dica: clique em qualquer área do Treemap para abrir a Fila de Priorização.</div>
-        </div>
-
       </div>
     </div>
   );
