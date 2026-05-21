@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 
 export function InvestmentMap() {
   const navigate = useNavigate();
-  const [hoveredFloorId, setHoveredFloorId] = useState<string | null>(null);
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; floorId: string } | null>(null);
+  const [selectedQuadrantId, setSelectedQuadrantId] = useState<string | null>(null);
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
-  const floors = useMemo(() => {
+  const quadrants = useMemo(() => {
     return [
       {
         id: 'dev_prod',
@@ -94,7 +93,10 @@ export function InvestmentMap() {
     ];
   }, []);
 
-  const hoveredFloor = useMemo(() => floors.find((f) => f.id === hoveredFloorId) || null, [floors, hoveredFloorId]);
+  const selectedQuadrant = useMemo(
+    () => quadrants.find((q) => q.id === selectedQuadrantId) || null,
+    [quadrants, selectedQuadrantId]
+  );
 
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
@@ -102,7 +104,7 @@ export function InvestmentMap() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Mapa de Investimento</div>
-            <div className="text-[12px] text-[var(--text-dim)] mt-1">Passe o mouse sobre um andar para ver o investimento e a quebra do ROI.</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Clique em um quadrante para visualizar o investimento e a quebra do ROI.</div>
           </div>
           <button
             type="button"
@@ -115,203 +117,144 @@ export function InvestmentMap() {
       </div>
 
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
-        <div className="relative flex justify-center py-10">
-          <div
-            className="relative w-full max-w-[640px]"
-            onMouseLeave={() => {
-              setHoveredFloorId(null);
-              setTooltip(null);
-            }}
-          >
-            <div
-              className="absolute left-1/2 -translate-x-1/2 -top-6 w-[88%] h-[32px] rounded-t-[20px]"
-              style={{
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03))',
-                border: '1px solid rgba(255,255,255,0.10)',
-                boxShadow: '0 18px 60px rgba(0,0,0,0.45)',
-              }}
-            />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] border border-[var(--border)]">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Planta Arquitetural</div>
+                <div className="text-[12px] text-[var(--text-dim)] mt-1">9 quadrantes · clique para selecionar</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedQuadrantId(null)}
+                className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+              >
+                Limpar seleção
+              </button>
+            </div>
 
             <div
-              className="rounded-[22px] overflow-hidden"
+              className="rounded-2xl overflow-hidden"
               style={{
                 border: '1px solid rgba(255,255,255,0.12)',
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
-                boxShadow: '0 30px 110px rgba(0,0,0,0.55)',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.14))',
+                boxShadow: '0 30px 110px rgba(0,0,0,0.45)',
               }}
             >
-              <div className="h-[26px]" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.08))' }} />
-
-              <div className="px-5 py-5">
-                <div className="grid grid-cols-1 gap-2">
-                  {[...floors].reverse().map((f, idx) => {
-                    const isHovered = hoveredFloorId === f.id;
-                    const isGround = idx === floors.length - 1;
-
+              <div className="p-4">
+                <div className="grid grid-cols-3 gap-3">
+                  {quadrants.map((q) => {
+                    const selected = q.id === selectedQuadrantId;
                     return (
-                      <div
-                        key={f.id}
-                        onMouseEnter={() => setHoveredFloorId(f.id)}
-                        onMouseMove={(e) => {
-                          const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                          const x = e.clientX - rect.left;
-                          const y = e.clientY - rect.top;
-                          setTooltip({ x, y, floorId: f.id });
-                        }}
-                        className="relative rounded-2xl transition-all duration-200"
+                      <button
+                        key={q.id}
+                        type="button"
+                        onClick={() => setSelectedQuadrantId(q.id)}
+                        className="text-left rounded-2xl transition-all duration-200"
                         style={{
-                          background: isHovered
-                            ? 'linear-gradient(180deg, rgba(56,189,248,0.16), rgba(56,189,248,0.08))'
+                          border: selected ? '1px solid rgba(56,189,248,0.55)' : '1px solid rgba(255,255,255,0.10)',
+                          background: selected
+                            ? 'linear-gradient(180deg, rgba(56,189,248,0.18), rgba(56,189,248,0.06))'
                             : 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))',
-                          border: isHovered ? '1px solid rgba(56,189,248,0.55)' : '1px solid rgba(255,255,255,0.10)',
-                          boxShadow: isHovered ? '0 18px 44px rgba(56,189,248,0.12)' : 'inset 0 1px 0 rgba(255,255,255,0.05)',
-                          transform: isHovered ? 'translateY(-1px) scale(1.01)' : 'translateY(0px) scale(1)',
+                          boxShadow: selected ? '0 18px 44px rgba(56,189,248,0.12)' : 'inset 0 1px 0 rgba(255,255,255,0.05)',
+                          transform: selected ? 'translateY(-1px) scale(1.01)' : 'translateY(0px) scale(1)',
                         }}
                       >
-                        <div className="absolute inset-y-0 left-0 w-[10px] rounded-l-2xl" style={{ background: isHovered ? 'rgba(56,189,248,0.60)' : 'rgba(255,255,255,0.06)' }} />
-
-                        <div className="px-4 py-3">
-                          <div className="flex items-center justify-between gap-3">
+                        <div className="p-3">
+                          <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="text-[11px] font-bold text-[var(--text)] truncate">{f.name}</div>
-                              <div className="text-[10px] text-[var(--text-dim)] mt-0.5">Passe o mouse para ver os números</div>
+                              <div className="text-[11px] font-bold text-[var(--text)] leading-snug line-clamp-2">{q.name}</div>
+                              <div className="text-[10px] text-[var(--text-dim)] mt-1">Clique para ver detalhes</div>
                             </div>
-
-                            <div className="shrink-0 flex items-center gap-2">
-                              <div
-                                className="w-[42px] h-[10px] rounded-full"
-                                style={{
-                                  background: isHovered
-                                    ? 'linear-gradient(90deg, rgba(56,189,248,0.95), rgba(147,197,253,0.15))'
-                                    : 'linear-gradient(90deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06))',
-                                }}
-                              />
-                            </div>
+                            <div
+                              className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5"
+                              style={{ background: selected ? 'rgba(56,189,248,0.95)' : 'rgba(255,255,255,0.20)' }}
+                            />
                           </div>
 
-                          <div className="mt-3 grid grid-cols-12 gap-2">
-                            <div className="col-span-9">
-                              <div className="grid grid-cols-6 gap-2">
-                                {Array.from({ length: 12 }).map((_, i) => (
-                                  <div
-                                    key={i}
-                                    className="rounded-md"
-                                    style={{
-                                      height: 16,
-                                      background: isHovered
-                                        ? 'linear-gradient(180deg, rgba(191,219,254,0.55), rgba(56,189,248,0.10))'
-                                        : 'linear-gradient(180deg, rgba(255,255,255,0.11), rgba(0,0,0,0.14))',
-                                      border: isHovered ? '1px solid rgba(56,189,248,0.22)' : '1px solid rgba(255,255,255,0.10)',
-                                      boxShadow: isHovered ? '0 0 0 1px rgba(56,189,248,0.06) inset' : '0 0 0 1px rgba(0,0,0,0.15) inset',
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className="col-span-3">
-                              <div className="h-full rounded-xl" style={{ background: 'rgba(0,0,0,0.16)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                <div className="h-[10px] rounded-t-xl" style={{ background: 'rgba(255,255,255,0.05)' }} />
-                                <div className="p-2">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {Array.from({ length: 6 }).map((_, i) => (
-                                      <div
-                                        key={i}
-                                        className="rounded-md"
-                                        style={{
-                                          height: 14,
-                                          background: isHovered
-                                            ? 'linear-gradient(180deg, rgba(56,189,248,0.35), rgba(56,189,248,0.05))'
-                                            : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.10))',
-                                          border: isHovered ? '1px solid rgba(56,189,248,0.18)' : '1px solid rgba(255,255,255,0.08)',
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                          <div className="mt-3 grid grid-cols-4 gap-2">
+                            {Array.from({ length: 8 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="rounded-md"
+                                style={{
+                                  height: 14,
+                                  background: selected
+                                    ? 'linear-gradient(180deg, rgba(191,219,254,0.55), rgba(56,189,248,0.08))'
+                                    : 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.12))',
+                                  border: selected ? '1px solid rgba(56,189,248,0.18)' : '1px solid rgba(255,255,255,0.10)',
+                                }}
+                              />
+                            ))}
                           </div>
 
                           <div className="mt-3 flex items-center justify-between">
-                            <div className="h-[10px] flex-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                            <div
+                              className="h-[10px] flex-1 rounded-full"
+                              style={{
+                                background: selected
+                                  ? 'linear-gradient(90deg, rgba(56,189,248,0.95), rgba(147,197,253,0.10))'
+                                  : 'linear-gradient(90deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06))',
+                              }}
+                            />
                           </div>
-
-                          {isGround && (
-                            <div className="mt-3 flex items-end justify-between gap-3">
-                              <div className="flex-1">
-                                <div className="h-[18px] rounded-xl" style={{ background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.08)' }} />
-                              </div>
-
-                              <div
-                                className="w-[108px] h-[48px] rounded-[14px] relative"
-                                style={{
-                                  background: isHovered
-                                    ? 'linear-gradient(180deg, rgba(56,189,248,0.20), rgba(0,0,0,0.20))'
-                                    : 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.20))',
-                                  border: isHovered ? '1px solid rgba(56,189,248,0.35)' : '1px solid rgba(255,255,255,0.10)',
-                                }}
-                              >
-                                <div className="absolute inset-0 flex items-center justify-center gap-2">
-                                  <div className="w-[44px] h-[34px] rounded-[10px]" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }} />
-                                  <div className="w-[44px] h-[34px] rounded-[10px]" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }} />
-                                </div>
-                                <div className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[6px] h-[6px] rounded-full" style={{ background: isHovered ? 'rgba(56,189,248,0.75)' : 'rgba(255,255,255,0.30)' }} />
-                              </div>
-                            </div>
-                          )}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
-
-              <div className="h-[26px]" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.28))' }} />
             </div>
+          </div>
 
-            <div className="mt-5 flex items-center justify-center">
-              <div className="w-[92%] h-[18px] rounded-full bg-[rgba(0,0,0,0.38)] blur-[12px]" />
-            </div>
+          <div className="glass-card rounded-xl p-4 sm:p-[18px_20px] border border-[var(--border)]">
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Detalhes do Quadrante</div>
 
-            {hoveredFloor && tooltip && hoveredFloor.id === tooltip.floorId && (
-              <div
-                className="absolute z-20 pointer-events-none"
-                style={{
-                  left: 0,
-                  top: 0,
-                  transform: `translate(${Math.min(Math.max(tooltip.x + 20, 10), 430)}px, ${Math.min(Math.max(tooltip.y + 20, 10), 520)}px)`,
-                }}
-              >
-                <div
-                  className="glass-card rounded-xl p-3 w-[300px]"
-                  style={{
-                    border: '1px solid rgba(56,189,248,0.32)',
-                    boxShadow: '0 26px 80px rgba(0,0,0,0.65)',
-                  }}
-                >
-                  <div className="text-[10px] text-[rgba(56,189,248,0.95)] font-bold uppercase tracking-[0.07em]">{hoveredFloor.name}</div>
+            {!selectedQuadrant ? (
+              <div className="mt-3 text-[13px] text-[var(--text-dim)]">
+                Selecione um quadrante na planta para visualizar investimento e ROI.
+              </div>
+            ) : (
+              <div className="mt-3">
+                <div className="text-[14px] font-extrabold text-[var(--text)]">{selectedQuadrant.name}</div>
 
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div className="rounded-lg bg-[rgba(0,0,0,0.18)] border border-[rgba(255,255,255,0.08)] p-2">
-                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Investimento</div>
-                      <div className="text-[12px] font-extrabold text-[var(--red)] mt-0.5">{fmtCurrency(hoveredFloor.investment)}</div>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(0,0,0,0.18)] p-3">
+                    <div className="text-[10px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Investimento Estimado</div>
+                    <div className="text-[18px] font-extrabold text-[var(--red)] mt-1">{fmtCurrency(selectedQuadrant.investment)}</div>
+                  </div>
+                  <div className="rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(0,0,0,0.18)] p-3">
+                    <div className="text-[10px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">ROI Estimado (Total)</div>
+                    <div className="text-[18px] font-extrabold text-[var(--green)] mt-1">{fmtCurrency(selectedQuadrant.roiTotal)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-[rgba(255,255,255,0.10)] bg-[rgba(0,0,0,0.18)] p-3">
+                  <div className="text-[10px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Quebra do ROI</div>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.18)] p-2">
+                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Receita</div>
+                      <div className="text-[12px] font-extrabold mt-1" style={{ color: 'var(--receita)' }}>{fmtCurrency(selectedQuadrant.receita)}</div>
                     </div>
-                    <div className="rounded-lg bg-[rgba(0,0,0,0.18)] border border-[rgba(255,255,255,0.08)] p-2">
-                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">ROI Total</div>
-                      <div className="text-[12px] font-extrabold text-[var(--green)] mt-0.5">{fmtCurrency(hoveredFloor.roiTotal)}</div>
+                    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.18)] p-2">
+                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Saving</div>
+                      <div className="text-[12px] font-extrabold mt-1" style={{ color: 'var(--saving)' }}>{fmtCurrency(selectedQuadrant.saving)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.18)] p-2">
+                      <div className="text-[9px] text-[var(--text-dim)] font-bold uppercase tracking-[0.07em]">Custo Evitado</div>
+                      <div className="text-[12px] font-extrabold mt-1" style={{ color: 'var(--custo-evitado)' }}>{fmtCurrency(selectedQuadrant.custoEvitado)}</div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-2 text-[11px] text-[var(--text-dim)]">
-                    Receita: <span className="font-bold" style={{ color: 'var(--receita)' }}>{fmtCurrency(hoveredFloor.receita)}</span>
-                    <br />
-                    Saving: <span className="font-bold" style={{ color: 'var(--saving)' }}>{fmtCurrency(hoveredFloor.saving)}</span>
-                    <br />
-                    Custo Evitado: <span className="font-bold" style={{ color: 'var(--custo-evitado)' }}>{fmtCurrency(hoveredFloor.custoEvitado)}</span>
-                  </div>
-
-                  <div className="mt-3 text-[11px] text-[rgba(56,189,248,0.95)] font-bold underline">Acesse os projetos pela Fila de Priorização</div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/queue')}
+                    className="w-full px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-[0.07em] bg-[rgba(56,189,248,0.14)] text-[rgba(56,189,248,0.95)] border border-[rgba(56,189,248,0.25)] hover:bg-[rgba(56,189,248,0.18)] transition-colors"
+                  >
+                    Abrir projetos na Fila de Priorização
+                  </button>
                 </div>
               </div>
             )}
