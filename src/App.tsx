@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { PrioritizationQueue } from './pages/PrioritizationQueue';
+import { InvestmentMap } from './pages/InvestmentMap';
 import { Projects } from './pages/Projects';
 import { Admin } from './pages/Admin';
 import { Logs } from './pages/Logs';
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route index element={<Dashboard />} />
                 <Route path="queue" element={<PrioritizationQueue />} />
+                <Route path="investment-map" element={<InvestmentMap />} />
                 <Route path="projects" element={<Projects />} />
                 <Route path="admin" element={<Admin />} />
                 <Route path="logs" element={<Logs />} />
