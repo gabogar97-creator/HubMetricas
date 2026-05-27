@@ -489,6 +489,8 @@ function QueueProjectsExpandableList({
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  const jiraIssueUrl = (jiraKey: string) => `https://zucchettibr.atlassian.net/browse/${encodeURIComponent(String(jiraKey || '').trim())}`;
+
   const toggle = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -502,10 +504,16 @@ function QueueProjectsExpandableList({
             <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</div>
-                    <div className="text-[12px] font-semibold text-[var(--text)] break-words">{p.title}</div>
-                  </div>
+                  <a
+                    href={jiraIssueUrl(p.jiraKey)}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-2 flex-wrap hover:opacity-85 transition-opacity"
+                    title="Abrir no Jira"
+                  >
+                    <span className="font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</span>
+                    <span className="text-[12px] font-semibold text-[var(--text)] break-words">{p.title}</span>
+                  </a>
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
                     <div>
                       <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU Origem</div>
