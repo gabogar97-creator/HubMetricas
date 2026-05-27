@@ -335,15 +335,22 @@ export function PrioritizationQueue() {
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartByArea} margin={{ top: 10, right: 18, left: 8, bottom: 8 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={60} />
-                      <YAxis tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} />
-                      <Tooltip
-                        contentStyle={{ background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10 }}
-                        formatter={(value: any, name: any) => [fmtCurrency(Number(value) || 0), name === 'roi' ? 'ROI' : 'Custo']}
-                        labelStyle={{ color: 'rgba(255,255,255,0.8)' }}
+                      <CartesianGrid stroke="var(--border2)" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: 'var(--text-dim)', fontSize: 11 }}
+                        interval={0}
+                        angle={-18}
+                        textAnchor="end"
+                        height={60}
                       />
-                      <Legend />
+                      <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10 }}
+                        formatter={(value: any, name: any) => [fmtCurrency(Number(value) || 0), name === 'roi' ? 'ROI' : 'Custo']}
+                        labelStyle={{ color: 'var(--text)' }}
+                      />
+                      <Legend wrapperStyle={{ color: 'var(--text-dim)', fontSize: 12 }} />
                       <Bar dataKey="roi" name="ROI" fill="#22c55e" radius={[8, 8, 0, 0]} />
                       <Bar dataKey="cost" name="Custo" fill="#ef4444" radius={[8, 8, 0, 0]} />
                     </BarChart>
@@ -356,15 +363,22 @@ export function PrioritizationQueue() {
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartByBu} margin={{ top: 10, right: 18, left: 8, bottom: 8 }}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={60} />
-                      <YAxis tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} />
-                      <Tooltip
-                        contentStyle={{ background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10 }}
-                        formatter={(value: any, name: any) => [fmtCurrency(Number(value) || 0), name === 'roi' ? 'ROI' : 'Custo']}
-                        labelStyle={{ color: 'rgba(255,255,255,0.8)' }}
+                      <CartesianGrid stroke="var(--border2)" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fill: 'var(--text-dim)', fontSize: 11 }}
+                        interval={0}
+                        angle={-18}
+                        textAnchor="end"
+                        height={60}
                       />
-                      <Legend />
+                      <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 10 }}
+                        formatter={(value: any, name: any) => [fmtCurrency(Number(value) || 0), name === 'roi' ? 'ROI' : 'Custo']}
+                        labelStyle={{ color: 'var(--text)' }}
+                      />
+                      <Legend wrapperStyle={{ color: 'var(--text-dim)', fontSize: 12 }} />
                       <Bar dataKey="roi" name="ROI" fill="#22c55e" radius={[8, 8, 0, 0]} />
                       <Bar dataKey="cost" name="Custo" fill="#ef4444" radius={[8, 8, 0, 0]} />
                     </BarChart>
