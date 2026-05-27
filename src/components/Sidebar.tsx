@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Hexagon, LayoutDashboard, Target, Settings, Activity, UserCog, LogOut, ListOrdered, Building2 } from 'lucide-react';
+import { Hexagon, LayoutDashboard, Target, Settings, Activity, UserCog, LogOut, ListOrdered } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
@@ -33,7 +33,6 @@ export function Sidebar() {
       <nav className="flex-1 py-3 overflow-y-auto">
         <NavItem to="/" icon={<Hexagon size={16} />} label="Dashboard" />
         <NavItem to="/queue" icon={<ListOrdered size={16} />} label="Fila de Priorização" />
-        <NavItem to="/investment-map" icon={<Building2 size={16} />} label="Mapa de Investimento" indent />
         <NavItem to="/projects" icon={<LayoutDashboard size={16} />} label="Projetos" />
         <NavItem to="/admin" icon={<Settings size={16} />} label="Cadastro" />
         <NavItem to="/logs" icon={<Activity size={16} />} label="Logs / Auditoria" hasNotification={hasNewLogs} />

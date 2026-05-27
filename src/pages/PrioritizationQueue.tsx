@@ -85,6 +85,11 @@ export function PrioritizationQueue() {
     return text;
   };
 
+  const jiraRichTextToText = (v: any, fallback = '—') => {
+    const t = jiraDescriptionToText(v);
+    return t ? t : fallback;
+  };
+
   const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string; listType?: 'to_prioritize' | 'prioritized' }) => {
     try {
       setJiraLoadingCount((c) => c + 1);
@@ -125,13 +130,13 @@ export function PrioritizationQueue() {
             buArea: asText(i?.customfield_10852, '—'),
             sponsor: asText(i?.customfield_10853, '—'),
             estimatedRoi12m: toNumberOrNull(i?.customfield_10848),
-            calcMemory: asText(i?.customfield_10849, '—'),
+            calcMemory: jiraRichTextToText(i?.customfield_10849, '—'),
             estimatedCostAvoided: toNumberOrNull(i?.customfield_10918),
-            costAvoidedCalcMemory: asText(i?.customfield_10919, '—'),
+            costAvoidedCalcMemory: jiraRichTextToText(i?.customfield_10919, '—'),
             estimatedSaving: toNumberOrNull(i?.customfield_10920),
-            savingCalcMemory: asText(i?.customfield_10921, '—'),
+            savingCalcMemory: jiraRichTextToText(i?.customfield_10921, '—'),
             estimatedRevenue: toNumberOrNull(i?.customfield_10922),
-            revenueCalcMemory: asText(i?.customfield_10923, '—'),
+            revenueCalcMemory: jiraRichTextToText(i?.customfield_10923, '—'),
             estimatedCost: cost,
             scope: jiraDescriptionToText(i?.description),
             effort: 'low',
@@ -259,7 +264,6 @@ export function PrioritizationQueue() {
 
   const openProjectModal = (p: any) => {
     setSelectedProject(p);
-    setScopeDraft(p?.scope || '');
   };
 
   return (
@@ -513,8 +517,6 @@ export function PrioritizationQueue() {
       {selectedProject && (
         <ProjectDetailsModal
           project={selectedProject}
-          scope={scopeDraft}
-          onChangeScope={setScopeDraft}
           fmtCurrency={fmtCurrency}
           onClose={() => setSelectedProject(null)}
         />
@@ -785,40 +787,14 @@ function QueueProjectsExpandableList({
 
 function ProjectDetailsModal({
   project,
-  scope,
-  onChangeScope,
   fmtCurrency,
   onClose
 }: {
   project: any;
-  scope: string;
-  onChangeScope: (v: string) => void;
   fmtCurrency: (n: number | null) => string;
   onClose: () => void;
 }) {
-  const fmtDateTime = (v: any) => {
-    if (!v) return '—';
-    const d = new Date(String(v));
-    if (Number.isNaN(d.getTime())) return String(v);
-    return new Intl.DateTimeFormat('pt-BR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(d);
-  };
-
-  const fmtDate = (v: any) => {
-    if (!v) return '—';
-    const d = new Date(String(v));
-    if (Number.isNaN(d.getTime())) return String(v);
-    return new Intl.DateTimeFormat('pt-BR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(d);
-  };
+  const jiraIssueUrl = (jiraKey: string) => `https://zucchettibr.atlassian.net/browse/${encodeURIComponent(String(jiraKey || '').trim())}`;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -826,27 +802,29 @@ function ProjectDetailsModal({
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
           <div>
             <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Detalhes do Projeto</div>
-            <div className="text-[14px] font-bold text-[var(--text)] mt-1">{project.jiraKey}: {project.title}</div>
+            <a
+              href={jiraIssueUrl(project.jiraKey)}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-[14px] font-bold text-[var(--text)] mt-1 inline-flex items-center gap-2 hover:opacity-85 transition-opacity"
+              title="Abrir no Jira"
+            >
+              <span className="font-mono">{project.jiraKey}</span>
+              <span className="text-[var(--text-dim)]">:</span>
+              <span>{project.title}</span>
+            </a>
           </div>
           <button onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">✕</button>
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Status (Jira)</div>
-              <div className="text-[13px] text-[var(--text)] mt-1">{project.jiraStatus || '—'}</div>
-            </div>
-            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Criado / Atualizado</div>
-              <div className="text-[13px] text-[var(--text)] mt-1">{fmtDateTime(project.created)} / {fmtDateTime(project.updated)}</div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU Origem</div>
               <div className="text-[13px] text-[var(--text)] mt-1">{project.bu}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Área da BU</div>
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Área</div>
               <div className="text-[13px] text-[var(--text)] mt-1">{project.buArea || '—'}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
@@ -854,31 +832,44 @@ function ProjectDetailsModal({
               <div className="text-[13px] text-[var(--text)] mt-1">{project.sponsor}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Início / Fim (Jira)</div>
-              <div className="text-[13px] text-[var(--text)] mt-1">{fmtDate(project.startDate)} / {fmtDate(project.endDate)}</div>
-            </div>
-            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
               <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Estimado</div>
               <div className="text-[13px] text-[var(--red)] font-semibold mt-1">{fmtCurrency(project.estimatedCost)}</div>
             </div>
             <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Estimativa (dias)</div>
-              <div className="text-[13px] text-[var(--text)] mt-1">{project.estimateDays == null || isNaN(Number(project.estimateDays)) ? '—' : Number(project.estimateDays)}</div>
-            </div>
-            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado (12m)</div>
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado</div>
               <div className="text-[13px] text-[var(--green)] font-semibold mt-1">{fmtCurrency(project.estimatedRoi12m)}</div>
             </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Evitado</div>
+              <div className="text-[13px] text-[var(--text)] font-semibold mt-1">{fmtCurrency(project.estimatedCostAvoided)}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Saving</div>
+              <div className="text-[13px] text-[var(--text)] font-semibold mt-1">{fmtCurrency(project.estimatedSaving)}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Receita</div>
+              <div className="text-[13px] text-[var(--text)] font-semibold mt-1">{fmtCurrency(project.estimatedRevenue)}</div>
+            </div>
           </div>
 
-          <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Memória do cálculo</div>
-            <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{project.calcMemory || '—'}</div>
-          </div>
-
-          <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
-            <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Descrição (Jira)</div>
-            <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{scope || '—'}</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Evitado - Memória do Cálculo</div>
+              <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{project.costAvoidedCalcMemory || '—'}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Saving - Memória do Cálculo</div>
+              <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{project.savingCalcMemory || '—'}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Receita - Memória do Cálculo</div>
+              <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{project.revenueCalcMemory || '—'}</div>
+            </div>
+            <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+              <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado - Memória do Cálculo</div>
+              <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{project.calcMemory || '—'}</div>
+            </div>
           </div>
 
           <div className="flex justify-end">
