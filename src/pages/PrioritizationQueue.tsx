@@ -1,24 +1,44 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 export function PrioritizationQueue() {
   const [queueListTab, setQueueListTab] = useState<'to_prioritize' | 'prioritized'>('to_prioritize');
   const [isMethodologyCollapsed, setIsMethodologyCollapsed] = useState(true);
   const [isMatrixCollapsed, setIsMatrixCollapsed] = useState(true);
+  const [kpiListFilter, setKpiListFilter] = useState<'all' | 'to_prioritize' | 'prioritized'>('all');
   const [filterBu, setFilterBu] = useState('');
   const [filterSponsor, setFilterSponsor] = useState('');
   const [filterId, setFilterId] = useState('');
   const [filterTitle, setFilterTitle] = useState('');
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [scopeDraft, setScopeDraft] = useState<string>('');
-  const [jiraLoading, setJiraLoading] = useState(false);
+  const [jiraLoadingCount, setJiraLoadingCount] = useState(0);
   const [jiraError, setJiraError] = useState<string>('');
-  const [jiraProjects, setJiraProjects] = useState<any[]>([]);
+  const [jiraProjectsByList, setJiraProjectsByList] = useState<{ to_prioritize: any[]; prioritized: any[] }>({
+    to_prioritize: [],
+    prioritized: [],
+  });
+  const [jiraLoaded, setJiraLoaded] = useState<{ to_prioritize: boolean; prioritized: boolean }>({
+    to_prioritize: false,
+    prioritized: false,
+  });
   const [jiraCredsModalOpen, setJiraCredsModalOpen] = useState(false);
   const envJiraEmail = import.meta.env.VITE_JIRA_EMAIL as string | undefined;
   const envJiraToken = import.meta.env.VITE_JIRA_API_TOKEN as string | undefined;
   const [jiraEmailDraft, setJiraEmailDraft] = useState(envJiraEmail || 'gabriel.garcia@zucchetti.com');
   const [jiraTokenDraft, setJiraTokenDraft] = useState(envJiraToken || '');
+
+  const jiraLoading = jiraLoadingCount > 0;
 
   const fmtCurrency = (n: number | null) => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
@@ -67,7 +87,7 @@ export function PrioritizationQueue() {
 
   const loadJiraEpics = async (opts?: { jiraEmail?: string; jiraApiToken?: string; listType?: 'to_prioritize' | 'prioritized' }) => {
     try {
-      setJiraLoading(true);
+      setJiraLoadingCount((c) => c + 1);
       setJiraError('');
 
       const effectiveListType = opts?.listType || queueListTab;
@@ -120,7 +140,8 @@ export function PrioritizationQueue() {
           };
       });
 
-      setJiraProjects(mapped);
+      setJiraProjectsByList((prev) => ({ ...prev, [effectiveListType]: mapped }));
+      setJiraLoaded((prev) => ({ ...prev, [effectiveListType]: true }));
     } catch (e: any) {
       console.error('Failed to load Jira epics:', e);
       const msg = e?.message || 'Falha ao consultar Jira.';
@@ -129,18 +150,77 @@ export function PrioritizationQueue() {
         setJiraCredsModalOpen(true);
       }
     } finally {
-      setJiraLoading(false);
+      setJiraLoadingCount((c) => Math.max(0, c - 1));
     }
   };
 
   useEffect(() => {
-    loadJiraEpics(envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken, listType: queueListTab } : { listType: queueListTab });
+    const creds = envJiraEmail && envJiraToken ? { jiraEmail: envJiraEmail, jiraApiToken: envJiraToken } : {};
+    const toLoad: ('to_prioritize' | 'prioritized')[] = ['to_prioritize', 'prioritized'];
+    toLoad.forEach((lt) => {
+      if (!jiraLoaded[lt] && !jiraLoading) {
+        loadJiraEpics({ ...creds, listType: lt });
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queueListTab]);
 
   const queueProjects = useMemo(() => {
-    return jiraProjects;
-  }, [jiraProjects]);
+    return jiraProjectsByList[queueListTab] || [];
+  }, [jiraProjectsByList, queueListTab]);
+
+  const allQueueProjects = useMemo(() => {
+    return [...(jiraProjectsByList.to_prioritize || []), ...(jiraProjectsByList.prioritized || [])];
+  }, [jiraProjectsByList]);
+
+  const kpiBaseProjects = useMemo(() => {
+    if (kpiListFilter === 'to_prioritize') return jiraProjectsByList.to_prioritize || [];
+    if (kpiListFilter === 'prioritized') return jiraProjectsByList.prioritized || [];
+    return allQueueProjects;
+  }, [allQueueProjects, jiraProjectsByList.prioritized, jiraProjectsByList.to_prioritize, kpiListFilter]);
+
+  const kpiReady = jiraLoaded.to_prioritize && jiraLoaded.prioritized && !jiraLoading;
+
+  const kpis = useMemo(() => {
+    const sum = (arr: any[], pick: (p: any) => number | null | undefined) => {
+      return arr.reduce((acc, p) => {
+        const v = pick(p);
+        return acc + (v != null && !isNaN(Number(v)) ? Number(v) : 0);
+      }, 0);
+    };
+
+    return {
+      roi: sum(kpiBaseProjects, (p) => p?.estimatedRoi12m),
+      cost: sum(kpiBaseProjects, (p) => p?.estimatedCost),
+      costAvoided: sum(kpiBaseProjects, (p) => p?.estimatedCostAvoided),
+      saving: sum(kpiBaseProjects, (p) => p?.estimatedSaving),
+      revenue: sum(kpiBaseProjects, (p) => p?.estimatedRevenue),
+    };
+  }, [kpiBaseProjects]);
+
+  const chartByArea = useMemo(() => {
+    const map = new Map<string, { name: string; roi: number; cost: number }>();
+    kpiBaseProjects.forEach((p: any) => {
+      const key = String(p?.buArea || '—');
+      const cur = map.get(key) || { name: key, roi: 0, cost: 0 };
+      cur.roi += p?.estimatedRoi12m != null && !isNaN(Number(p.estimatedRoi12m)) ? Number(p.estimatedRoi12m) : 0;
+      cur.cost += p?.estimatedCost != null && !isNaN(Number(p.estimatedCost)) ? Number(p.estimatedCost) : 0;
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.roi - a.roi);
+  }, [kpiBaseProjects]);
+
+  const chartByBu = useMemo(() => {
+    const map = new Map<string, { name: string; roi: number; cost: number }>();
+    kpiBaseProjects.forEach((p: any) => {
+      const key = String(p?.bu || '—');
+      const cur = map.get(key) || { name: key, roi: 0, cost: 0 };
+      cur.roi += p?.estimatedRoi12m != null && !isNaN(Number(p.estimatedRoi12m)) ? Number(p.estimatedRoi12m) : 0;
+      cur.cost += p?.estimatedCost != null && !isNaN(Number(p.estimatedCost)) ? Number(p.estimatedCost) : 0;
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.roi - a.roi);
+  }, [kpiBaseProjects]);
 
   const availableBus = useMemo(() => {
     const set = new Set<string>();
@@ -184,6 +264,114 @@ export function PrioritizationQueue() {
 
   return (
     <div className="flex flex-col gap-[18px] animate-[fadeIn_0.2s_ease]">
+      <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <div className="text-[10px] text-[var(--text-mid)] font-bold uppercase tracking-[0.07em]">Indicadores da Fila</div>
+            <div className="text-[12px] text-[var(--text-dim)] mt-1">Somatórios baseados no Jira. Use o filtro para recalcular.</div>
+          </div>
+          <div className="flex gap-1 bg-[var(--bg4)] p-1 rounded-lg w-fit flex-wrap">
+            <button
+              onClick={() => setKpiListFilter('all')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                kpiListFilter === 'all' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setKpiListFilter('to_prioritize')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                kpiListFilter === 'to_prioritize' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Projetos para Priorização
+            </button>
+            <button
+              onClick={() => setKpiListFilter('prioritized')}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                kpiListFilter === 'prioritized' ? 'bg-[var(--bg3)] text-[var(--text)]' : 'text-[var(--text3)] hover:text-[var(--text2)]'
+              }`}
+            >
+              Projetos Priorizados
+            </button>
+          </div>
+        </div>
+
+        {!kpiReady ? (
+          <div className="p-6 text-center text-[13px] text-[var(--text-dim)]">Carregando indicadores e gráficos…</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado</div>
+                <div className="text-[14px] text-[var(--green)] font-bold mt-1">{fmtCurrency(kpis.roi)}</div>
+              </div>
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Estimado</div>
+                <div className="text-[14px] text-[var(--red)] font-bold mt-1">{fmtCurrency(kpis.cost)}</div>
+              </div>
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Evitado</div>
+                <div className="text-[14px] text-[var(--text)] font-bold mt-1">{fmtCurrency(kpis.costAvoided)}</div>
+              </div>
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Saving</div>
+                <div className="text-[14px] text-[var(--text)] font-bold mt-1">{fmtCurrency(kpis.saving)}</div>
+              </div>
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Receita</div>
+                <div className="text-[14px] text-[var(--text)] font-bold mt-1">{fmtCurrency(kpis.revenue)}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-xl p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em] mb-2">ROI + Custo por Área</div>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartByArea} margin={{ top: 10, right: 18, left: 8, bottom: 8 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={60} />
+                      <YAxis tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10 }}
+                        formatter={(value: any, name: any) => [fmtCurrency(Number(value) || 0), name === 'roi' ? 'ROI' : 'Custo']}
+                        labelStyle={{ color: 'rgba(255,255,255,0.8)' }}
+                      />
+                      <Legend />
+                      <Bar dataKey="roi" name="ROI" fill="#22c55e" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="cost" name="Custo" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-xl p-3">
+                <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em] mb-2">ROI + Custo por BU</div>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartByBu} margin={{ top: 10, right: 18, left: 8, bottom: 8 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} interval={0} angle={-18} textAnchor="end" height={60} />
+                      <YAxis tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10 }}
+                        formatter={(value: any, name: any) => [fmtCurrency(Number(value) || 0), name === 'roi' ? 'ROI' : 'Custo']}
+                        labelStyle={{ color: 'rgba(255,255,255,0.8)' }}
+                      />
+                      <Legend />
+                      <Bar dataKey="roi" name="ROI" fill="#22c55e" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="cost" name="Custo" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="glass-card rounded-xl p-4 sm:p-[18px_20px]">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="min-w-0">
