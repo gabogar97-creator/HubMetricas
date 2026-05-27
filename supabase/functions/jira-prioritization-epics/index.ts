@@ -67,6 +67,12 @@ Deno.serve(async (req) => {
       "customfield_10851",
       "customfield_10852",
       "customfield_10853",
+      "customfield_10918",
+      "customfield_10919",
+      "customfield_10920",
+      "customfield_10921",
+      "customfield_10922",
+      "customfield_10923",
       "customfield_10016",
     ].join(",");
 
@@ -111,6 +117,12 @@ Deno.serve(async (req) => {
       customfield_10851: i?.fields?.customfield_10851,
       customfield_10852: i?.fields?.customfield_10852,
       customfield_10853: i?.fields?.customfield_10853,
+      customfield_10918: i?.fields?.customfield_10918,
+      customfield_10919: i?.fields?.customfield_10919,
+      customfield_10920: i?.fields?.customfield_10920,
+      customfield_10921: i?.fields?.customfield_10921,
+      customfield_10922: i?.fields?.customfield_10922,
+      customfield_10923: i?.fields?.customfield_10923,
       customfield_10016: i?.fields?.customfield_10016,
     }));
 

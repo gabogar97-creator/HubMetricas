@@ -89,6 +89,8 @@ export function PrioritizationQueue() {
             ? Number(storyPointsOrDays) * 433
             : null;
 
+          const toNumberOrNull = (v: any) => (v != null && !isNaN(Number(v)) ? Number(v) : null);
+
           return {
             id: i?.id,
             jiraKey: i?.key,
@@ -102,8 +104,14 @@ export function PrioritizationQueue() {
             bu: asText(i?.customfield_10851, '—'),
             buArea: asText(i?.customfield_10852, '—'),
             sponsor: asText(i?.customfield_10853, '—'),
-            estimatedRoi12m: i?.customfield_10848 != null && !isNaN(Number(i.customfield_10848)) ? Number(i.customfield_10848) : null,
+            estimatedRoi12m: toNumberOrNull(i?.customfield_10848),
             calcMemory: asText(i?.customfield_10849, '—'),
+            estimatedCostAvoided: toNumberOrNull(i?.customfield_10918),
+            costAvoidedCalcMemory: asText(i?.customfield_10919, '—'),
+            estimatedSaving: toNumberOrNull(i?.customfield_10920),
+            savingCalcMemory: asText(i?.customfield_10921, '—'),
+            estimatedRevenue: toNumberOrNull(i?.customfield_10922),
+            revenueCalcMemory: asText(i?.customfield_10923, '—'),
             estimatedCost: cost,
             scope: jiraDescriptionToText(i?.description),
             effort: 'low',
@@ -307,10 +315,9 @@ export function PrioritizationQueue() {
         {jiraLoading && queueProjects.length === 0 ? (
           <div className="p-8 text-center text-[13px] text-[var(--text-dim)]">Carregando projetos do Jira…</div>
         ) : (
-          <QueueProjectsTable
+          <QueueProjectsExpandableList
             projects={filteredProjects}
             fmtCurrency={fmtCurrency}
-            onProjectClick={openProjectModal}
           />
         )}
       </div>
@@ -473,65 +480,109 @@ function QuadrantMatrix({ projects, fmtCurrency, onProjectClick }: { projects: a
   );
 }
 
-function QueueProjectsTable({
+function QueueProjectsExpandableList({
   projects,
   fmtCurrency,
-  onProjectClick
 }: {
   projects: any[];
   fmtCurrency: (n: number | null) => string;
-  onProjectClick: (p: any) => void;
 }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggle = (id: string) => {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-xs">
-        <thead>
-          <tr>
-            {[
-              'ID',
-              'Título',
-              'BU Origem',
-              'Área da BU',
-              'Sponsor',
-              'Custo Estimado',
-              'ROI Estimado (12m)',
-              'Memória do Cálculo',
-            ].map(h => (
-              <th
-                key={h}
-                className="p-[9px_12px] text-left bg-[var(--bg3)] text-[var(--text-dim)] font-bold text-[10px] uppercase tracking-[0.07em] border-b border-[var(--border)] whitespace-nowrap"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--border)]">
-          {projects.map((p: any) => (
-            <tr
-              key={p.id}
-              className="hover:bg-[rgba(255,255,255,0.02)] transition-colors cursor-pointer"
-              onClick={() => onProjectClick(p)}
-            >
-              <td className="p-[10px_12px] font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</td>
-              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-normal break-words max-w-[220px] leading-snug">{p.title}</td>
-              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.bu}</td>
-              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.buArea || '—'}</td>
-              <td className="p-[10px_12px] text-[var(--text-mid)] whitespace-nowrap">{p.sponsor}</td>
-              <td className="p-[10px_12px] text-[var(--red)] whitespace-nowrap">{fmtCurrency(p.estimatedCost)}</td>
-              <td className="p-[10px_12px] text-[var(--green)] font-semibold whitespace-nowrap">{fmtCurrency(p.estimatedRoi12m)}</td>
-              <td className="p-[10px_12px] text-[var(--text-mid)] min-w-[320px]">{p.calcMemory}</td>
-            </tr>
-          ))}
-          {projects.length === 0 && (
-            <tr>
-              <td colSpan={8} className="p-8 text-center text-[13px] text-[var(--text-dim)]">
-                Nenhum projeto nesta lista.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {projects.map((p: any) => {
+        const isOpen = Boolean(expanded[String(p.id)]);
+        return (
+          <div key={p.id} className="glass-card rounded-xl border border-[var(--border)] overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-mono text-[11px] text-[var(--text)] whitespace-nowrap">{p.jiraKey}</div>
+                    <div className="text-[12px] font-semibold text-[var(--text)] break-words">{p.title}</div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">BU Origem</div>
+                      <div className="text-[12px] text-[var(--text-mid)] mt-1">{p.bu}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Área</div>
+                      <div className="text-[12px] text-[var(--text-mid)] mt-1">{p.buArea || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Sponsor</div>
+                      <div className="text-[12px] text-[var(--text-mid)] mt-1">{p.sponsor}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Estimado</div>
+                      <div className="text-[12px] text-[var(--red)] font-semibold mt-1">{fmtCurrency(p.estimatedCost)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado</div>
+                      <div className="text-[12px] text-[var(--green)] font-semibold mt-1">{fmtCurrency(p.estimatedRoi12m)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Evitado</div>
+                      <div className="text-[12px] text-[var(--text-mid)] font-semibold mt-1">{fmtCurrency(p.estimatedCostAvoided)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Saving</div>
+                      <div className="text-[12px] text-[var(--text-mid)] font-semibold mt-1">{fmtCurrency(p.estimatedSaving)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Receita</div>
+                      <div className="text-[12px] text-[var(--text-mid)] font-semibold mt-1">{fmtCurrency(p.estimatedRevenue)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => toggle(String(p.id))}
+                  className="shrink-0 px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                >
+                  {isOpen ? 'Recolher' : 'Expandir'}
+                </button>
+              </div>
+            </div>
+
+            {isOpen && (
+              <div className="border-t border-[var(--border)] p-4 bg-[rgba(255,255,255,0.02)]">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                    <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Custo Evitado - Memória do Cálculo</div>
+                    <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{p.costAvoidedCalcMemory || '—'}</div>
+                  </div>
+                  <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                    <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Saving - Memória do Cálculo</div>
+                    <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{p.savingCalcMemory || '—'}</div>
+                  </div>
+                  <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                    <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">Receita - Memória do Cálculo</div>
+                    <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{p.revenueCalcMemory || '—'}</div>
+                  </div>
+                  <div className="bg-[var(--bg4)] border border-[var(--border2)] rounded-lg p-3">
+                    <div className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-[0.07em]">ROI Estimado - Memória do Cálculo</div>
+                    <div className="text-[13px] text-[var(--text)] mt-2 whitespace-pre-wrap">{p.calcMemory || '—'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {projects.length === 0 && (
+        <div className="p-8 text-center text-[13px] text-[var(--text-dim)] glass-card rounded-xl border border-[var(--border)]">
+          Nenhum projeto nesta lista.
+        </div>
+      )}
     </div>
   );
 }
