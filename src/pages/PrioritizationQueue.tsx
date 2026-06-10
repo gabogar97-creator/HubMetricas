@@ -137,6 +137,7 @@ export function PrioritizationQueue() {
             savingCalcMemory: jiraRichTextToText(i?.customfield_10921, '—'),
             estimatedRevenue: toNumberOrNull(i?.customfield_10922),
             revenueCalcMemory: jiraRichTextToText(i?.customfield_10923, '—'),
+            criticalRoiUrl: asText(i?.customfield_10952, ''),
             estimatedCost: cost,
             scope: jiraDescriptionToText(i?.description),
             effort: 'low',
@@ -696,6 +697,18 @@ function QueueProjectsExpandableList({
 
   const jiraIssueUrl = (jiraKey: string) => `https://zucchettibr.atlassian.net/browse/${encodeURIComponent(String(jiraKey || '').trim())}`;
 
+  const safeUrlOrEmpty = (v: any) => {
+    const s = String(v || '').trim();
+    if (!s) return '';
+    try {
+      // Accept absolute URLs only
+      const u = new URL(s);
+      return u.toString();
+    } catch {
+      return '';
+    }
+  };
+
   const toggle = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -755,13 +768,30 @@ function QueueProjectsExpandableList({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => toggle(String(p.id))}
-                  className="shrink-0 px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
-                >
-                  {isOpen ? 'Recolher' : 'Expandir'}
-                </button>
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = safeUrlOrEmpty(p?.criticalRoiUrl);
+                      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                    }}
+                    disabled={!safeUrlOrEmpty(p?.criticalRoiUrl)}
+                    className={`px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
+                      safeUrlOrEmpty(p?.criticalRoiUrl)
+                        ? 'bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)]'
+                        : 'bg-[var(--bg4)] text-[var(--text3)] opacity-60 cursor-not-allowed'
+                    }`}
+                  >
+                    Análise Crítica de ROI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggle(String(p.id))}
+                    className="px-3 py-2 rounded-md text-xs font-semibold bg-[var(--bg4)] text-[var(--text2)] hover:text-[var(--text)] transition-colors"
+                  >
+                    {isOpen ? 'Recolher' : 'Expandir'}
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
       "customfield_10921",
       "customfield_10922",
       "customfield_10923",
+      "customfield_10952",
       "customfield_10016",
     ].join(",");
 
@@ -123,6 +124,7 @@ Deno.serve(async (req) => {
       customfield_10921: i?.fields?.customfield_10921,
       customfield_10922: i?.fields?.customfield_10922,
       customfield_10923: i?.fields?.customfield_10923,
+      customfield_10952: i?.fields?.customfield_10952,
       customfield_10016: i?.fields?.customfield_10016,
     }));
 
